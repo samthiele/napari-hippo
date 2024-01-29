@@ -1,0 +1,63 @@
+name: napari-hippo
+display_name: Hippo
+contributions:
+  commands:
+    - id: napari-hippo.get_ENVI_reader
+      python_name: napari_hippo._reader:napari_get_ENVI_reader
+      title: Open ENVI format hyperspectral data
+    - id: napari-hippo.get_specim_reader
+      python_name: napari_hippo._reader:napari_get_specim_reader
+      title: Open raw Specim image directories (for FX, Fenix and OWL cameras).
+    - id: napari-hippo.write_multiple
+      python_name: napari_hippo._writer:write_multiple
+      title: Save multi-layer data with Hippo
+    - id: napari-hippo.write_single_image
+      python_name: napari_hippo._writer:write_single_image
+      title: Save image data with Hippo
+    - id: napari-hippo.make_sample_data
+      python_name: napari_hippo._sample_data:make_sample_data
+      title: Load sample data from Hippo
+    - id: napari-hippo.make_IOTools
+      python_name: napari_hippo._ioTools:IOWidget
+      title: Load and save hyperspectral datasets
+    - id: napari-hippo.make_crunchyTools
+      python_name: napari_hippo._crunchyTools:CrunchyToolsWidget
+      title: Some crunchy tools for data munging
+    - id: napari-hippo.make_hyliteTools
+      python_name: napari_hippo._hyliteTools:HyliteToolsWidget
+      title: Basic hyperspectral data analysis
+    - id: napari-hippo.make_fieldTools
+      python_name: napari_hippo._fieldTools:FieldToolsWidget
+      title: Quick field checks
+    - id: napari-hippo.make_caterpillar
+      python_name: napari_hippo._caterpillarWidget:CaterpillarWidget
+      title: Spectral viewer
+  readers:
+    - command: napari-hippo.get_ENVI_reader
+      accepts_directories: false
+      filename_patterns: ['*.hdr', '*.dat', '*.png', '*.jpg', '*.jpeg', '*.bmp']
+    - command: napari-hippo.get_specim_reader
+      accepts_directories: true
+      filename_patterns: ['*']
+  writers:
+    - command: napari-hippo.write_multiple
+      layer_types: ['image*','labels*']
+      filename_extensions: []
+    - command: napari-hippo.write_single_image
+      layer_types: ['image','labels*']
+      filename_extensions: ['.dat', '.hdr']
+  sample_data:
+    - command: napari-hippo.make_sample_data
+      display_name: Hippo HSI
+      key: unique_id.1
+  widgets:
+    - command: napari-hippo.make_IOTools
+      display_name: Input / Output
+    - command: napari-hippo.make_crunchyTools
+      display_name: Crunchy
+    - command: napari-hippo.make_hyliteTools
+      display_name: Hylite
+    - command: napari-hippo.make_fieldTools
+      display_name: Field QAQC
+    - command: napari-hippo.make_caterpillar
+      display_name: Caterpillar
