@@ -12,14 +12,14 @@ on:
   release:
     types: [published]
 
-permissions:
-  id-token: write
-
 jobs:
   deploy:
   
     runs-on: ubuntu-latest
     environment: release
+
+    permissions:
+      id-token: write
     
     steps:
     - uses: actions/checkout@v3
