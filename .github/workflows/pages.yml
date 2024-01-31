@@ -24,7 +24,8 @@ jobs:
           python-version: '3.10'
       # install pdoc
       - run: pip install pdoc==12.3.0
-      - run: pip install napari
+      - run: pip install PyQt5
+      - run: pip install "napari[all]"
       - run: pip install .
       
       # build documentation with pdoc into docs/
