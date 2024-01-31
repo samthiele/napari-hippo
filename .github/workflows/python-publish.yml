@@ -6,22 +6,22 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Publish
+name: Upload Python Package
 
 on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+  
 jobs:
-  pypi-publish:
+  deploy:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
+    
     environment:
       name: release
-      url: https://pypi.org/p/napari-hippo
-      
-    permissions:
-      id-token: write
     
     steps:
     - uses: actions/checkout@v3
@@ -36,4 +36,7 @@ jobs:
     - name: Build package
       run: python -m build
     - name: Publish package
-      uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
