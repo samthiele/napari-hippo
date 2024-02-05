@@ -18,7 +18,7 @@ Follow [these instructions](https://napari.org/stable/tutorials/fundamentals/ins
 
 ## Documentation
 
-We are in the process of building a documentation wiki for this page [here](https://github.com/samthiele/napari-hippo/wiki).
+We are in the process of building a documentation wiki for this plugin [here](https://github.com/samthiele/napari-hippo/wiki).
 
 ## Contributing
 
