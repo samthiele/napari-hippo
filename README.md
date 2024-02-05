@@ -16,6 +16,9 @@ You can install `napari-hippo` via [pip]:
 
     pip install napari-hippo
 
+## Documentation
+
+We are in the process of building a documentation wiki for this page [here](https://github.com/samthiele/napari-hippo/wiki).
 
 ## Contributing
 
@@ -28,7 +31,7 @@ Distributed under the terms of the [MIT] license,
 
 ## Issues
 
-If you encounter any problems, please [file an issue] along with a detailed description.
+If you encounter any problems, please [file an issue](https://github.com/samthiele/napari-hippo/issues/new/choose) along with a detailed description.
 
 ## Citation
 
