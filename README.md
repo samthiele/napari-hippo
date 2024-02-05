@@ -24,12 +24,12 @@ We are in the process of building a documentation wiki for this plugin [here](ht
 
 ## Contributing
 
-Contributions are very welcome :blush:
+Contributions are very welcome! Please feel free to submit pull requests or tell us about your ideas (or problems) on the [discussions](https://pypi.org/project/napari-hippo) page.
 
 ## License
 
 Distributed under the terms of the [MIT](https://github.com/samthiele/napari-hippo/blob/main/LICENSE) license,
-"napari-hippo" is free and open source software
+`napari-hippo` is free and open source software.
 
 ## Issues
 
@@ -37,4 +37,4 @@ If you encounter any problems, please [file an issue](https://github.com/samthie
 
 ## Citation
 
-A citation for this plugin will be announced shortly.
+A citation for `napari-hippo` will be announced shortly.
