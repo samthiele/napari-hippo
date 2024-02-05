@@ -26,7 +26,7 @@ Contributions are very welcome :blush:
 
 ## License
 
-Distributed under the terms of the [MIT] license,
+Distributed under the terms of the [MIT](https://github.com/samthiele/napari-hippo/blob/main/LICENSE) license,
 "napari-hippo" is free and open source software
 
 ## Issues
