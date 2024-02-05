@@ -12,7 +12,7 @@ A large and slightly clumsy plugin for viewing and analysing hyperspectral data 
 
 ## Installation
 
-You can install `napari-hippo` via [pip]:
+Follow [these instructions](https://napari.org/stable/tutorials/fundamentals/installation) to first install napari. Then you can install `napari-hippo` via [pip]:
 
     pip install napari-hippo
 
