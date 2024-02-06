@@ -242,7 +242,7 @@ def saveMasks():
         if l.metadata.get('type', '') == 'MASK':
             for i,p in enumerate(l.metadata.get('path',[])):
                 mask = hylite.HyImage( np.array( l.data[i] ).T[...,None] )
-                mask.data = mask.data.astype(np.uint8)
+                mask.data = mask.data.astype(np.uint16) # N.B. cannot be uint8 otherwise we over-write our PNG files!!
                 print("Saving mask to %s" % p )
                 io.save(p, mask )
 
