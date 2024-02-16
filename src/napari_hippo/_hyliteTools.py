@@ -95,8 +95,13 @@ def falseColor( bands : str = "%d, %d, %d" % hylite.RGB,
     # todo - we should copy the affine matrix here?
     # (but have to deal with the different dimensionality of hypercubes vs rgb images)
     meta = dict(path=layer.metadata['path'], type='HSIp', wav=result.get_wavelengths())
+    if ']' in layer.name:
+        name = '[slice]'+layer.name.split(']')[1] + " [%s]"%(bands)
+    else:
+        name = '[slice] ' + layer.name + " [%s]"%(bands)
+    
     return viewer.add_image( h2n( result.data ), rgb=True,
-                       name=layer.name + " [%s]"%(bands),
+                       name=name,
                        metadata=meta )
 
 def hullCorrect(wmin : float = 2000.,
@@ -195,8 +200,12 @@ def calculator( operation : str = '$2 * 2190:2210 / (2150+2230)' ):
     meta = dict(path=layer.metadata['path'],
                 type='HSIp',
                 wav=np.array(result.get_wavelengths()))
+    if ']' in layer.name:
+        name = '[calc]'+layer.name.split(']')[1]
+    else:
+        name = '[calc] ' + layer.name
     return viewer.add_image(h2n(result.data), rgb=False, colormap='gist_earth',
-                            name=layer.name + " [calc]", metadata=meta )
+                            name=name, metadata=meta )
 
 
 def calculate(image, op: str = "1000. + $2 * 2190:2210 / (2150+2230)"):
