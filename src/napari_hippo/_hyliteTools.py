@@ -141,9 +141,7 @@ def dimensionReduction( method : str = 'PCA', ndim : int = 3, wmin : float = 200
         return
 
     brange = ( image.get_band_index(wmin), image.get_band_index(wmax) )
-    result, _ = R( image, bands= ndim, band_range=brange )
-
-    print(np.isfinite(result.data).any() )
+    result = R( image, bands= ndim, band_range=brange )[0]
 
     meta = dict(path=layer.metadata['path'],
                 type='HSIf',
