@@ -285,18 +285,20 @@ def saveMasks(mode='Save to disk'):
             return
     
     if 'nan' in mode.lower(): # 'Set as nan'
-        
         # apply mask
         if mask is not None:
             msk = (mask.data[...,0] == 0).T
             for l in viewer.layers:
-                mask 
-                if l.metadata.get('type', '') == 'HSIf':
-                    l.data[ :, msk ] = np.nan
-                    l.refresh()
-                elif l.metadata.get('type','') == 'HSIp':
-                    l.data[ msk , : ] = np.nan
-                    l.refresh()
+                if isinstance(l, napari.layers.Image ):
+                    if l.metadata.get('type', '') == 'HSIf':
+                        l.data = l.data.astype(np.float32) # nans are float
+                        l.data[ :, 
+                            msk[:l.data.shape[1], :l.data.shape[2]] ] = np.nan
+                        l.refresh()
+                    elif l.rgb or l.metadata.get('type','') == 'HSIp':
+                        l.data = l.data.astype(np.float32) # nans are float
+                        l.data[ msk[:l.data.shape[0], :l.data.shape[1]] , : ] = np.nan
+                        l.refresh()
 
     if 'crop' in mode.lower(): # 'Nan and crop'
         xmn = np.argmin( msk.all(axis=1) )
@@ -305,13 +307,17 @@ def saveMasks(mode='Save to disk'):
         ymx = msk.shape[1] - np.argmin( msk.all(axis=0)[::-1] )
         
         for l in viewer.layers:
-            if l.metadata.get('type', '') == 'HSIf':
-                l.data = l.data[:,xmn:xmx,ymn:ymx] 
-                l.refresh()
-            elif l.metadata.get('type','') == 'HSIp':
-                l.data = l.data[xmn:xmx, ymn:ymx, :]
-                l.refresh()
-        
+            if isinstance(l, napari.layers.Image ):
+                if l.metadata.get('type', '') == 'HSIf':
+                    l.data = l.data[:,
+                                    xmn:min(xmx,l.data.shape[1]),
+                                    ymn:min(ymx,l.data.shape[2])] 
+                    l.refresh()
+                elif l.rgb or l.metadata.get('type','') == 'HSIp':
+                    l.data = l.data[xmn:min(xmx, l.data.shape[0]), 
+                                    ymn:min(ymx, l.data.shape[1]), :]
+                    l.refresh()
+            
         # our mask is no longer the correct shape; remove!
         for l in ['mask', 'exclude', 'include']:
             if l in viewer.layers:
@@ -665,11 +671,12 @@ def exportPatches( filename : pathlib.Path = pathlib.Path('.'),
                         continue # skip this one
 
                 img_name = os.path.splitext( os.path.basename( l.metadata['path'] ) )[0]
-                labels = points.text.values
+
                 # extract points
-                if points is not None:
+                if (points is not None) and (len(points.data) > 0):
                     spectra = []
                     names = []
+                    labels = points.text.values
                     for i,(py,px) in enumerate(points.data):
                         print("Extracting spectra from pixel (%d,%d) in image %s with %d bands"%(px,py,img_name, image.band_count()))
                         if (px > 0) and (py > 0):
@@ -693,7 +700,7 @@ def exportPatches( filename : pathlib.Path = pathlib.Path('.'),
                     O.free()
 
                 # extract ROIs 
-                if roi is not None:
+                if (roi is not None) and (len(roi.data) > 0):
                     labels = roi.text.values
                     masks = roi.to_masks((image.ydim(), image.xdim()))
                     spectra = [] # for average spectra library

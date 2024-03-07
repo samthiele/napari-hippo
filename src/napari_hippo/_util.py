@@ -66,6 +66,11 @@ def getHyImage(viewer, layer=None, bands=None, pixels=None):
                                 return d
                             else:
                                 return hylite.HyImage( n2h( l.data ), wav=w).export_bands(bands), l
+                elif l.rgb:
+                    if bands is None:
+                        return hylite.HyImage( n2h( l.data )), l
+                    else:
+                        return hylite.HyImage( n2h( l.data )).export_bands(bands), l
 
     # if we got here, there are not appropriate images in the selection
     napari.utils.notifications.show_warning("Please select an HSI image.")

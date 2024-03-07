@@ -17,6 +17,9 @@ from ._guiBase import GUIBase
 from skimage.transform import AffineTransform, warp
 from skimage.measure import ransac
 
+from napari_hippo import getHyImage, h2n, n2h
+
+import pathlib
 class CrunchyToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
@@ -161,9 +164,9 @@ def addCoreg():
     # get viewer
     viewer = napari.current_viewer()
 
-    layers = list(viewer.layers.selection)
-    if len(layers) == 0:
-        layers = list(viewer.layers)
+    #layers = list(viewer.layers.selection)
+    #if len(layers) == 0:
+    layers = list(viewer.layers)
 
     points = []
     for l in layers:
@@ -301,26 +304,90 @@ def exportAffine():
     napari.utils.notifications.show_info( msg )
     return np.unique(flist)
 
-def resample():
+def resample( loadFromFile : pathlib.Path = None):
     """
-    Apply affine and resample the selected image(s). If none are selected then apply to all images.
+    Opens a new widget that allows affine transforms to be applied to images or data cubes. 
+    The path argument can be used to load affine transforms from a npz file, following the format
+    used by `Save affine`. If None, available affines will be loaded from layers in the current
+    viewer instead.
     """
+
     viewer = napari.current_viewer()  # get viewer
-    layers = list(viewer.layers.selection)
-    if len(layers) == 0:
-        layers = list(viewer.layers)
 
-    for l in layers:
-        if isinstance(l, napari.layers.Image):
-            a = AffineTransform( l.affine.affine_matrix )
-            if l.rgb:
-                tgt = ( viewer.layers[l.metadata['base']]._data_view.shape[0],
-                                    viewer.layers[l.metadata['base']]._data_view.shape[1] )
-                warped = warp(l.data, inverse_map=a.inverse, output_shape=tgt) # bands are last axis
-            else:
-                warped = warp( np.transpose(l.data, (1,2,0) ), inverse_map=a.inverse, output_shape=tgt ) # bands are first axis
-            viewer.add_image(warped, metadata=l.metadata, name=l.name + ' [warped]')
+    # gather possible affine transforms
+    A = {"Identity" : np.eye(3)} # available affine matrices
+    if (loadFromFile is not None): # load from file
+        print("Loading coreg points from %s" % str(loadFromFile))
+        if 'npz' in loadFromFile.suffix:
+            f = np.load(loadFromFile)
+            for k in f.keys():
+                if 'affine' in k:
+                    n = k.split('_')[0]
+                    aff = np.vstack( [f[k], [0., 0., 1.]] )
 
+                    # NASTY HACK - apply crunchy RGB scale if needed
+                    if ('rgb_scale' in f) and ('RGB' in k):
+                        aff /= f['rgb_scale']
+                    
+                    A[n] = aff
+                    
+    else: # load from layers
+        for l in list(viewer.layers):
+            if (l.affine.affine_matrix.shape[0] == 3) and \
+                (not (l.affine.affine_matrix == np.eye(3)).all()):
+                A[l.name] = l.affine.affine_matrix
+    
+    # contruct a function to do our dirty work
+    def apply( source_image : 'napari.layers.Image' = None,
+                affine : str = list(A.keys())[0],
+                target_image : 'napari.layers.Image' = None,
+                factor : int = 1 ):
+        """
+        Select and apply an affine transform to the selected layer(s).
 
+        Args:
+            - base_image = the result will be sampled to this images size.
+            - affine = the affine matrix to apply (selected from another layer).
+            - factor = a scaling factor to multiply the affine transform and output dimensions by.
+                    Useful for preserving an image at e.g., 6x the resolution of another. Must be an integer.
+        """
+        if (source_image is None) or (target_image is None):
+            napari.utils.notifications.show_warning("Please select a source and target image")
+        viewer = napari.current_viewer()  # get viewer again (threading...)
+        _A = A[affine][[0,1], :] # get relevant parts of affine
+        dest,_ = getHyImage( viewer, target_image )
+        target_shape = (dest.xdim()*factor, dest.ydim()*factor)
+        for l in [source_image]:
+            if isinstance(l, napari.layers.Image):
+                source,_ = getHyImage( viewer, l )
+                ishape = (source.xdim(), source.ydim()) # just for reference
 
+                # construct skimage affine
+                a = AffineTransform(np.vstack( [_A[0]*factor, _A[1]*factor, [0,0,1] ] ) )
+                # apply
+                source.data = warp( source.data, 
+                                    inverse_map=a.inverse, 
+                                    output_shape=target_shape+(source.data.shape[-1],))
 
+                # add result
+                print("Resampled image %s from shape %s to shape %s."%(l.name,
+                                                                       ishape,
+                                                                       target_shape ))
+                viewer.add_image( h2n( source.data ), rgb=l.rgb,
+                    name=l.name + " [warped]",
+                    metadata=l.metadata )
+
+    # construct GUI and show it
+    #widget = magicgui(apply, 
+    #                    call_button='Resample', 
+    #                    affine={"choices":list(A.keys())},
+    #                    auto_call=False)
+    #widget.show()
+    viewer.window.add_function_widget(apply, 
+                                      magic_kwargs=dict(
+                                          call_button='Resample', 
+                                          affine={"choices":list(A.keys())},
+                                          auto_call=False
+                                      ),
+                                      name="Resample",
+                                      area='left')
