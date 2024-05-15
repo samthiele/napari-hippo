@@ -1,4 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from ._util import n2h, h2n, getHyImage
 from ._reader import napari_get_ENVI_reader, napari_get_specim_reader
