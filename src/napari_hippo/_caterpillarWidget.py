@@ -21,8 +21,9 @@ import napari
 
 from ._guiBase import GUIBase
 from napari_hippo import getHyImage
-
-
+import pathlib
+import hylite
+import os
 # matplotlib widgets
 # (blatantly stolen from :
 #  https://biapol.github.io/blog/johannes_mueller/entry_user_interf2/#creating-advanced-standalone-guis )
@@ -126,6 +127,12 @@ class CaterpillarWidget(GUIBase):
         self.caterpillar_widget = magicgui(addCaterpillar, call_button='Create', auto_call=False)
         self._add([self.caterpillar_widget], 'Spectral Caterpillar')
 
+        self.export_widget = magicgui(export, call_button='Export', auto_call=False,
+                                      filename={"mode": "w"},
+                                      format={"choices": ['csv',
+                                                          'txt','lib']})
+        self._add([self.export_widget], 'Export library')
+
 
 def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=True, quartiles=True ):
     """
@@ -147,6 +154,45 @@ def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.l
     widget = Caterpillar(viewer, base_image, query_points, median, quartiles )
     viewer.window.add_dock_widget(widget, area='bottom')
 
+def export( base_image : 'napari.layers.Image', 
+            query_points : 'napari.layers.Points', 
+            size : int = 4,
+            format : str = 'csv',
+            filename : pathlib.Path = pathlib.Path('') ):
+    """
+    Export the spectra from the specified points to a spectral library.
+    """
+    viewer = napari.current_viewer()
 
+    # get image
+    image, _ = getHyImage(viewer, layer=base_image)
+    if image is None:
+        return
+
+    # assembl spectral library
+    indices = []
+    names = []
+    for i, (pxy, c) in enumerate(zip(query_points.data, query_points.face_color)):
+        if len(pxy) > 2:
+            x = int(pxy[2])
+            y = int(pxy[1])
+        else:
+            x = int(pxy[1])
+            y = int(pxy[0])
+        if (x >= 0) and (x < image.xdim()) and (y >= 0) and ( y < image.ydim() ):
+            indices.append( (x,y) )
+            names.append("P%d"%(i+1))
+    if len(indices) > 0:
+        lib = hylite.hylibrary.from_indices( image, indices, s=size, names=names )
+        if 'csv' in format:
+            filename = os.path.splitext(filename)[0] + ".csv"
+            hylite.io.libraries.saveLibraryCSV( filename, lib )
+        elif 'txt' in format:
+            filename = os.path.splitext(filename)[0] + ".txt"
+            hylite.io.libraries.saveLibraryTXT( filename, lib )
+        elif 'lib' in format:
+            filename = os.path.splitext(filename)[0] + ".lib"
+            hylite.io.libraries.saveLibraryLIB( filename, lib )
+        napari.utils.notifications.show_info("Exported %d spectra."%lib.data.shape[0])
 
 

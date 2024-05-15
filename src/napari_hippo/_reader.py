@@ -91,6 +91,8 @@ def read_specim( path ):
                 with open(meta[0], 'r') as f:
                     for l in f.readlines():
                         if 'sensor type' in l.lower():
+                            if 'fenix1k' in l.lower():
+                                sensor = 'fenix1k'
                             if 'fenix' in l.lower():
                                 sensor = 'fenix'
                             elif 'fx50' in l.lower():
@@ -103,10 +105,16 @@ def read_specim( path ):
                 if 'fenix' in sensor: # Fenix
                     from hylite.reference.spectra import R90 as ref
                     from hylite.sensors import Fenix
-                    image = Fenix.correct_folder( root, calib=ref,
-                                                        flip=True,
+                    if '1k' in sensor:
+                        image = Fenix.correct_folder( root, calib=ref,
+                                                        flip=True, # no lense flip for 1k
                                                         shift=False,
                                                         verbose=True)
+                    else:
+                        image = Fenix.correct_folder( root, calib=ref,
+                                                            flip=True,
+                                                            shift=False,
+                                                            verbose=True)
                 elif 'fx50' in sensor: # FX50
                     from hylite.sensors import FX50
                     image = FX50.correct_folder(root, bpr=True, flip=True,

@@ -330,7 +330,7 @@ def resample( loadFromFile : pathlib.Path = None):
                         aff /= f['rgb_scale']
                     
                     A[n] = aff
-                    
+
     else: # load from layers
         for l in list(viewer.layers):
             if (l.affine.affine_matrix.shape[0] == 3) and \
@@ -364,6 +364,7 @@ def resample( loadFromFile : pathlib.Path = None):
 
                 # construct skimage affine
                 a = AffineTransform(np.vstack( [_A[0]*factor, _A[1]*factor, [0,0,1] ] ) )
+                
                 # apply
                 source.data = warp( source.data, 
                                     inverse_map=a.inverse, 
