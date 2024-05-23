@@ -22,8 +22,9 @@ class FieldToolsWidget(GUIBase):
         self.qaqc_widget = magicgui(qaqc, call_button='Compute')
         self._add([self.qaqc_widget], 'QAQC')
 
-        self.elc_widget = magicgui(ELC, call_button='Quick Correct' )
-        self._add([self.elc_widget], 'Calibration')
+        self.fit_elc_widget = magicgui(ELC, call_button='Quick Correct' )
+        self.apply_elc_widget = magicgui(applyELC, call_button='Apply Previous' )
+        self._add([self.fit_elc_widget, self.apply_elc_widget], 'Calibration')
 
         # add spacer at the bottom of panel
         self.qvl.addStretch()
@@ -47,6 +48,10 @@ def qaqc( saturation : bool = True, noise : bool = True ):
         napari.utils.notifications.show_info("Please select a hyperspectral image image to compute QAQC.")
 
 def ELC( ):
+    """
+    Select a region in an image and compute a rough ELC correction from it.
+    (by assuming that the region is a white panel)
+    """
     viewer = napari.current_viewer()  # get viewer
     if 'panel' not in viewer.layers:
         panel_layer = viewer.add_shapes(None, ndim=2, name='panel', shape_type='polygon')
@@ -59,11 +64,14 @@ def ELC( ):
             # get mask
             image.decompress()
             mask = panel_layer.to_masks((image.ydim(), image.xdim()))[0]
-            viewer.add_labels(mask, name='Panel Pixels')
 
             # compute average spectra
             ref = np.nanmedian( image.data[ mask.T, : ], axis=0 )
 
+            # store it in labels layer showing panel pixels
+            viewer.add_labels(mask, name='Panel Pixels', 
+                    metadata=dict(spectra=ref))
+            
             # correct image
             image.data = image.data / ref[None,None,:].astype(np.float32)
 
@@ -74,4 +82,28 @@ def ELC( ):
                 wav=image.get_wavelengths()))
         else:
             napari.utils.notifications.show_info("Please select a hyperspectral image image to correct.")
+
+def applyELC():
+    """
+    Apply the previously computed ELC (see ELC()) to a different image.
+    """
+    viewer = napari.current_viewer()  # get viewer
+    image, layer = getHyImage(viewer) # get selected image
+    if 'Panel Pixels' in viewer.layers:
+        ref = viewer.layers['Panel Pixels'].metadata.get('spectra',None)
+        if ref is not None:
+            # correct image
+            image.decompress()
+            image.data = image.data / ref[None,None,:].astype(np.float32)
+
+            # add it
+            viewer.add_image(h2n(image.data), name=layer.name + ' [elc]', contrast_limits=(0.0,0.75), metadata=dict(
+                type='HSIf',  # HSI full
+                path=layer.metadata['path'],
+                wav=image.get_wavelengths()))
+        else:
+            napari.utils.notifications.show_error("'Panel Pixels' layer contains no ELC?") 
+    else:
+        napari.utils.notifications.show_info("Please compute an ELC first. This will be stored in the 'Panel Pixels' layer.") 
+
 

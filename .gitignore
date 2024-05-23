@@ -6,3 +6,8 @@ build/
 *.egg-info
 .coverage
 coverage.xml
+src/napari_hippo/testdata/block1.dat
+src/napari_hippo/testdata/block1.dat
+src/napari_hippo/testdata/block1.hdr
+src/napari_hippo/testdata/block2.dat
+src/napari_hippo/testdata/block2.hdr
