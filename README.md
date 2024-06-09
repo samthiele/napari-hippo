@@ -39,5 +39,7 @@ If you encounter any problems, please [file an issue](https://github.com/samthie
 
 If you have found `napari-hippo` useful for your work, please cite:
 
-> [Thiele, S., Kirsch, M., Kamath, A., Lorenz, S., Kim, Y. and Gloaguen, R., 2024, April. Big data techniques for real-time hyperspectral core logging and mineralogical upscaling. In 2024 International Conference on Machine Intelligence for GeoAnalytics and Remote Sensing (MIGARS) (pp. 1-3). IEEE. 10.1109/MIGARS61408.2024.10544616](https://www.dx.doi.org/10.1109/MIGARS61408.2024.10544616)
+> [Thiele, S., Simoes, F., Lorenz, S., Kirsch, M., Gloaguen, R., 2024. Napari-Hippo: An open-source python-based GUI for hyperspectral data analysis. International Conference on Machine Intelligence for GeoAnalytics and Remote Sensing (MIGARS). 10.13140/RG.2.2.10899.90406 ](https://www.dx.doi.org/10.13140/RG.2.2.10899.90406)
+
+> [Thiele, S., Kirsch, M., Kamath, A., Lorenz, S., Kim, Y. and Gloaguen, R., 2024. Big data techniques for real-time hyperspectral core logging and mineralogical upscaling. International Conference on Machine Intelligence for GeoAnalytics and Remote Sensing (MIGARS) (pp. 1-3). IEEE. 10.1109/MIGARS61408.2024.10544616](https://www.dx.doi.org/10.1109/MIGARS61408.2024.10544616)
 
