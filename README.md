@@ -37,4 +37,7 @@ If you encounter any problems, please [file an issue](https://github.com/samthie
 
 ## Citation
 
-A citation for `napari-hippo` will be announced shortly.
+If you have found `napari-hippo` useful for your work, please cite:
+
+> [Thiele, S., Kirsch, M., Kamath, A., Lorenz, S., Kim, Y. and Gloaguen, R., 2024, April. Big data techniques for real-time hyperspectral core logging and mineralogical upscaling. In 2024 International Conference on Machine Intelligence for GeoAnalytics and Remote Sensing (MIGARS) (pp. 1-3). IEEE. 10.1109/MIGARS61408.2024.10544616](https://www.dx.doi.org/10.1109/MIGARS61408.2024.10544616)
+
