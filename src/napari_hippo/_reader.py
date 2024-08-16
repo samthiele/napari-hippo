@@ -5,8 +5,10 @@ import os
 import numpy as np
 from hylite import io
 import glob
-from napari_hippo import h2n
+import napari
+from napari_hippo import h2n, HSICube, getMode
 from hylite.io import loadHeader, matchHeader, loadSubset
+import hylite
 
 def napari_get_ENVI_reader(path):
     """
@@ -71,10 +73,31 @@ def napari_get_specim_reader(path):
     # otherwise we return the *function* that can read ``path``.
     return read_specim
 
-def read_specim( path ):
+
+def _getkwags(image, name, path=None, dtype=None):
+    # define kwargs for the viewer.add_image method
+    add_kwargs = dict(name=name, 
+                        metadata=dict())
+
+    # add all image header info to metadata
+    for k,v in image.header.items():
+        add_kwargs['metadata'][k.replace(' ', '_')] =  v
+    if dtype is not None:
+        add_kwargs['metadata']['type'] = dtype
+    if path is not None:
+        add_kwargs['metadata']['path'] = path
+    return add_kwargs
+
+def read_specim( path, return_image=False ):
     """
-    Read and preprocess a raw specim image.
+    Read and preprocess a raw specim image. If return_image is True
+    then this returns a HyImage result rather than an arguments tuple as expected
+    by napari.
     """
+    if getMode(napari.current_viewer()) == 'Batch':
+        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+        return []
+    
     if isinstance(path, str):
         path = [path]
 
@@ -84,7 +107,6 @@ def read_specim( path ):
             root = os.path.dirname(manifest)
             print(os.path.join(root, 'metadata/*.xml'))
             meta = glob.glob(os.path.join(root, 'metadata/*.xml'))
-            print(meta)
             if len(meta) > 0:
                 image = None
                 sensor = ''
@@ -107,7 +129,7 @@ def read_specim( path ):
                     from hylite.sensors import Fenix
                     if '1k' in sensor:
                         image = Fenix.correct_folder( root, calib=ref,
-                                                        flip=True, # no lense flip for 1k
+                                                        flip=False, # no lense flip for 1k
                                                         shift=False,
                                                         verbose=True)
                     else:
@@ -130,16 +152,14 @@ def read_specim( path ):
                     image.data = image.data.astype(np.float32) / 255.
 
                 if image is not None:
-                    data = image.data.T
-                    name = '[cube]'+os.path.splitext(os.path.basename( root ))[0]
-                    add_kwargs = dict(name=name, metadata=dict(
-                        type='HSIf',
-                        path=p,
-                        wav=image.get_wavelengths()))
-                    out.append((data, add_kwargs, "image"))
+                    # store add_image kwargs
+                    if return_image:
+                        out.append(image)
+                    else:
+                        out.append( HSICube.construct( image, os.path.basename(p), args_only=True, path=p ) )
     return out
 
-def read_RGB( path, force_rgb=True ):
+def read_RGB( path, force_rgb=True, return_image=False ):
     """
     Open one or more normal RGB images in .png, .jpg or .bmp format.
 
@@ -147,47 +167,50 @@ def read_RGB( path, force_rgb=True ):
         path: Path to the image to load
         force_rgb: True if the HSI should be flattened to a false-colour RGB image. This
                    argument is meaningless in this context (and ignored), but included for compatability.
+        return_image: If True, a list of HyImage instances is returned instead of the expected napari kwargs.
 
     Returns: A tuple containing (image data, napari kwargs, image name ).
     """
+    if getMode(napari.current_viewer()) == 'Batch':
+        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+        return []
+
     # wrap in list
     if isinstance(path, str):
         path = [path]
 
     out = []
     for p in path:
-        #if p.endswith(".hdr") or p.endswith(".dat"):
-        #    out += read_ENVI( p, force_rgb ) # use different reader here
-        #    continue
-        #if not p.endswith(".png") or p.endswith(".jpg") or p.endswith(".jpeg") or p.endswith(".bmp"):
-        #    continue # pass silently
 
         # parse layer name
-        name = '[slice] ' + os.path.splitext(os.path.basename(p))[0]
+        name = os.path.splitext(os.path.basename(p))[0]
 
         # load image
         image = io.load(p)
         image.decompress()
 
-        # define image metadata
-        add_kwargs = dict( name=name, metadata=dict(type='RGB', path=p ) )
-        if (image.band_count() == 4):
-            add_kwargs['metadata']['type'] = add_kwargs['metadata'].get('type', 'RGBA')  # this is a RGBA image
-
-        out.append((h2n(image.data), add_kwargs, 'image'))
+        # store add_image kwargs
+        if return_image:
+            out.append(image)
+        else:
+            out.append( HSICube.construct( image, name, args_only=True, path=p ) )
     return out
 
-def read_ENVI( path, force_rgb=False ):
+def read_ENVI( path, force_rgb=False, return_image=False ):
     """
     Open one or more ENVI images.
 
     Args:
         path: Path to the image to load
         force_rgb: True if the HSI should be flattened to a false-colour RGB image.
+        return_image: If True, a list of HyImage instances is returned instead of the expected napari kwargs.
 
     Returns: A tuple containing (image data, napari kwargs, image name ).
 
     """
+    if getMode(napari.current_viewer()) == 'Batch':
+        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+        return []
 
     # wrap in list
     if isinstance(path, str):
@@ -195,38 +218,37 @@ def read_ENVI( path, force_rgb=False ):
 
     out = []
     for p in path:
-
-        #if p.endswith(".png") or p.endswith(".jpg") or p.endswith(".jpeg") or p.endswith(".bmp"):
-        #    out += read_RGB(p, force_rgb)  # use different reader here
-        #    continue
-        #if not (p.endswith(".hdr") or p.endswith(".dat")):
-        #    continue # pass silently
-
         # parse layer name
-        if force_rgb:
-            name = '[slice] '+os.path.splitext(os.path.basename(p))[0]
-        else:
-            name = '[cube] '+os.path.splitext(os.path.basename(p))[0]
+        name = os.path.splitext(os.path.basename(p))[0]
 
-        # load as HyImage
+        # load with hylite
         p, _ = matchHeader(p) # make sure we have the path to the header file
         h = io.loadHeader(p)
         if force_rgb: # load image as RGB preview only
             if 'default bands' in h:
                 bands = h.get_list('default bands').astype(int)
             else:
+                # defaults
                 n = h.band_count()
                 bands = np.array([0.25 * n, 0.5 * n, 0.75 * n]).astype(int)
+
+                # try better combo
+                for bands in [hylite.RGB, hylite.VNIR, hylite.SWIR, hylite.MWIR, hylite.LWIR]:
+                    if (np.min(bands) > np.min(image.get_wavelengths())):
+                        if (np.max(bands) < np.max(image.get_wavelengths())):
+                            try:
+                                bands = np.array([image.get_band_index(b) for b in bands])
+                            except:
+                                pass # don't worry if there isn't the target band
             image = loadSubset( p, bands=bands )
         else: # load full image
             image = io.load( p )
         image.decompress()
+        
+        # store add_image kwargs
+        if return_image:
+            out.append(image)
+        else:
+            out.append( HSICube.construct( image, name, args_only=True, path=p ) )
 
-        # kwargs for the viewer.add_image method
-        add_kwargs = dict(name=name, metadata=dict(type='HSIf', path=p, wav=image.get_wavelengths()))
-        if h.band_count() > image.band_count(): # if we opened just a preview image
-            add_kwargs['metadata']['type'] = 'HSIp' # flag that this is preview slice
-
-        # store
-        out.append( ( h2n(image.data), add_kwargs, 'image') )
     return out

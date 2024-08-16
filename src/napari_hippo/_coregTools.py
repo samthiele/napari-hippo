@@ -20,7 +20,7 @@ from skimage.measure import ransac
 from napari_hippo import getHyImage, h2n, n2h
 
 import pathlib
-class CrunchyToolsWidget(GUIBase):
+class CoregToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 

@@ -7,40 +7,33 @@ from natsort import natsorted
 import glob
 import napari
 from napari_hippo import napari_get_ENVI_reader
-from napari_hippo._util import getHyImage, n2h
+from napari_hippo._base import *
 import os
 import hylite
 from hylite import io
 
-class IOWidget(GUIBase):
+class BasicWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 
-        #btn = QPushButton("Load with query")
-        #btn.clicked.connect(self._query)
-
         self.query_widget = magicgui(search, call_button='Search', root={'mode': 'd'}, auto_call=False)
-        #self.info_widget = magicgui(info, call_button="Show Layer Info")
-        #self._add([self.query_widget, self.info_widget], 'Import')
-        self._add([self.query_widget], 'Import')
+        self._add([self.query_widget], 'Batch')
 
-        self.load_mask_widget = magicgui(loadMasks, call_button='Load/Init Masks', mode={"choices": ['filename', 'directory']})
-        self.save_mask_widget = magicgui(saveMasks, call_button='Save/Apply Masks', mode={"choices": ['Save to disk', 'Set as nan', 'Nan and crop']})
-        self.update_mask_widget = magicgui(updateMasks, call_button='Update')
-        self._add( [self.load_mask_widget, self.save_mask_widget,
-                     self.update_mask_widget], 'Mask' )
+        self.load_mask_widget = magicgui(loadMasks, call_button='Load/Create Masks', 
+                                         mode={"choices": ['filename', 'directory']} )
+        self.save_mask_widget = magicgui(saveMasks, call_button='Save/Apply Masks', 
+                                         mode={"choices": ['Save to file', 'Set as nan', 'Nan and crop']})
+        self._add( [self.load_mask_widget, self.save_mask_widget], 'Mask' )
 
-        self.updateGeometry_widget = magicgui(updateGeometry, call_button="Save/Load")
-        self.exportPatch_widget = magicgui(exportPatches, call_button='Export Patches',
-                                             filename={"mode": "w", "filter":"*.hyc"})
-        self._add( [self.updateGeometry_widget,self.exportPatch_widget], 'Geometry')
+        #self.updateGeometry_widget = magicgui(updateGeometry, call_button="Save/Load")
+        #self.exportPatch_widget = magicgui(exportPatches, call_button='Export Patches',
+        #                                     filename={"mode": "w", "filter":"*.hyc"})
+        #self._add( [self.updateGeometry_widget,self.exportPatch_widget], 'Geometry')
 
-# /Users/thiele67/Documents/Python/napari-hippo/src/napari_hippo/testdata
 def search( root : pathlib.Path = pathlib.Path(''),
             filter : str='*.png',
             rgb_only = True,
-            stack = True,
-            stretch = False ):
+            stack = True ):
     """
     Search for image files matching the query string and load them into Napari.
 
@@ -49,7 +42,6 @@ def search( root : pathlib.Path = pathlib.Path(''),
         filter: The query string. Should follow [glob syntax](https://man7.org/linux/man-pages/man7/glob.7.html).
         rgb_only: Only load the preview bands ('default bands' key in header file) of HSI images (rather than loading the whole data cube).
         stack: Stack loaded images into a single image file. Useful for flicking through large numbers of images.
-        stretch: Stretch images so they are approximately the same. Note that this is incompatible with the stack argument.
 
     Returns:
         images: a list containing the image layer(s) added.
@@ -67,185 +59,60 @@ def search( root : pathlib.Path = pathlib.Path(''),
         r = napari_get_ENVI_reader( f )
         if r is not None:
             paths.append( f ) # store root path for stacked images
-            images += r( f, force_rgb=rgb_only )
-            if stack:
-                images[-1][1]['name'] = images[-1][1]['name'].replace('[slice]','[stack]')
-    if len(images) == 0:
+            images += r( f, force_rgb=rgb_only, return_image=True )
+            
+    if (len(images) == 0) & (getMode(napari.current_viewer()) != 'Batch'):
         napari.utils.notifications.show_warning("No files found.")
+    if len(images) == 0:
         return []
 
     out = []
     if stack: # add image stack
-        for i in range(len(images)-1, -1, -1):
-            if not ( (images[i][0].shape[-1] == 3) or (images[i][0].shape[-1] == 4) ):
-                del images[i] # drop non-RGB images
-                napari.utils.notifications.show_warning("Warning: non-rgb images cannot be stacked.")
-
-        # build dask array stack as it allows images to have different sizes
-        try:
-            import dask
-        except:
-            napari.utils.notifications.show_warning("Warning: images cannot be stacked without having dask installed.")
-            return []
-
-        shape = np.max([i[0].shape for i in images], axis=0)
-        stack = dask.array.stack([dask.array.from_delayed(dask.delayed(i[0]), shape=shape, dtype=i[0].dtype,
-                                                          ) for i in images])
-        out += [viewer.add_image( stack, **images[0][1] )]
-        out[-1].metadata['path'] = paths
-        out[-1].metadata['type'] = 'STACK'
-
-        viewer.reset_view()
-        viewer.dims.set_point(0,0)
-        napari.utils.notifications.show_info("Loaded stack of %d images." % len(images))
-
+        name = 'batch'
+        out += [Stack.construct( images, paths, name, viewer=viewer ).layer]
     else: # add images individually
-        if stretch:
-            target_shape = images[0][0].shape
-            for image, kwargs, name in images:
-                # find scale factor
-                s = min( float(target_shape[0]) / image.shape[0], float(target_shape[1]) / image.shape[1] )
+        for i,p in zip(images, paths):
+            # create layer
+            name = os.path.splitext( os.path.basename( p ) )[0]
+            image = HSICube.construct(i, name, viewer=viewer, path=p )
+            out.append(image.layer)
 
-                # define affine matrix
-                affine = np.array([[s, 0, 0],
-                                   [0, s, 0], [0, 0, 1]])
-                # add to kwargs
-                kwargs['affine']  = affine
+            # sort out stretch
+            # if stretch and len(out) > 1:
+            #     # find scale factor that fits to target shape
+            #     target_shape = out[0].data.shape
+            #     s = min( float(target_shape[0]) / image.layer.data.shape[0], float(target_shape[1]) / image.layer.data.shape[1] )
 
-                # filthy hack: ignore _aruco in name (for SiSuRock coreg workflows)
-                if '_aruco' in kwargs['name']:
-                    kwargs['name'] = kwargs['name'].split('_')[0]
-
-        for image, kwargs, name in images:
-            out += [viewer.add_image(image, **kwargs)]
-
+            #     # define affine matrix
+            #     affine = np.array([[s, 0, 0],
+            #                        [0, s, 0], [0, 0, 1]])
+                
+            #     # set layer affine
+            #     out[-1].affine = affine
+        
         viewer.reset_view()
         viewer.dims.set_point(0, 0)
         napari.utils.notifications.show_info("Loaded %d images." % len(images))
 
         return out
-
-# def info():
-#     """
-#     Displays metadata on the selected image as a notification.
-#     """
-#     viewer = napari.current_viewer()  # get viewer
-#     layers = list(viewer.layers.selection)
-#     if len(layers) > 0:
-#         l = layers[0]
-
-#         # get data
-#         path = l.metadata.get('path', 'undefined')
-#         if isinstance(path, list):
-#             path = path[viewer.dims.current_step[0]]
-#         name = os.path.basename( os.path.dirname(path) ) + '/' + os.path.basename(path)
-
-#         # create message
-#         msg = '%s (%s)\n'%(name, l.metadata.get('type', 'undefined'))
-#         for k,v in l.metadata.items():
-#             if k not in ['type']: # add other metadata if it exists
-#                 print(k, ': ', v ) # print metadata to console for reference too
-#                 line = ''
-#                 if isinstance(v, list) or isinstance(v, np.ndarray):
-#                     line="%s: %s"%(k, str(v[viewer.dims.current_step[0]]))
-#                 else:
-#                     line="%s: %s"%(k, str(v))
-
-#                 # clip for clarity
-#                 if len(line) > 30:
-#                     line = line[:30] + "..." + line[-15:]
-#                 msg+=line+"\n"
-
-#         # show message
-#         napari.utils.notifications.show_info(msg)
-
-def loadMasks( mode : str = 'directory' ):
+    
+def loadMasks( mode='filename' ):
     """
     Load mask files associated with an cube, slice or image stack.
 
-    Args:
-        mode = the matching mode to identify mask files. Options are:
-                - filename: masks will be envi files (.hdr extension) with the same filename
-                            as the source image (must be .png, .jpg or similar).
-                - directory: masks will be envi files called mask.hdr in the same directory as the
-                            source image.
+    If mode is `filename` then masks are expected to match the name of the source
+    of the image being masked, but with a "_mask" suffix. If `directory` is selected
+    then masks are expecte to be called "mask.hdr" in the same directory as the source
+    file.
     """
     viewer = napari.current_viewer()  # get viewer
-    layers = list(viewer.layers.selection)
+    layers = list(viewer.layers.selection) # get selected layers
     if len(layers) == 0:
         layers = list(viewer.layers)
-
     for l in layers:
-        if 'path' in l.metadata:
+        Mask.construct( l, viewer, mode=mode ) # construct new masks
 
-            # get paths to load
-            if l.metadata.get('type', '') == 'STACK':
-                paths = l.metadata['path']
-            elif len(layers) == 1:
-                paths = [l.metadata['path']]
-            else:
-                continue
-
-            # load or create masks
-            maskpaths=[]
-            data = []
-            for i, p in enumerate(paths):
-                if mode == 'filename':
-                    p = os.path.splitext(p)[0] + ".hdr"
-                elif mode == 'directory':
-                    p = os.path.join( os.path.dirname(p), 'mask.hdr' )
-                else:
-                    assert False, "Error - invalid mode %s" % mode
-
-                maskpaths.append(p)
-                if os.path.exists(p):
-                    print("Loading mask for %s" % p)
-                    data.append(io.load(p).data[:,:,0].T.astype(int))
-                else:
-                    if l.metadata.get('type', '') == 'STACK':
-                        shape = np.array( l.data[i] ).shape
-                    elif (len(l.data.shape) == 3) and (l.data.shape[-1] > 4):  # data cube; (band, x, y)
-                        shape = np.array(l.data[0].shape)
-                    else:  # conventional RGB or greyscale (x,y,band)
-                        shape = np.array([l.data.shape[0], l.data.shape[1]])
-
-                    print("Creating mask for %s with shape %s." % (p,shape))
-                    data.append( np.zeros( (shape[0], shape[1]), dtype=int) )
-
-            # single image mask; easy
-            if len(maskpaths) == 1:
-                viewer.add_labels(data[0], name='mask', metadata=dict(type='MASK', path=maskpaths))
-            else:
-                # build dask array for multi-mask stack
-                try:
-                    import dask
-                except:
-                    assert False, "Error - please install dask before building image stacks!"
-                shape = np.max([d.shape for d in data], axis=0)
-                for i in range(len(data)):
-                    if data[i] is None:
-                        data[i] = np.zeros(shape, dtype=int)
-                stack = dask.array.stack([dask.array.from_delayed(dask.delayed(d), shape=shape, dtype=int,
-                                                                ) for d in data])
-                viewer.add_labels(stack, name='mask', metadata=dict(type='MASK', path=maskpaths))
-
-    if len(layers) > 0: # add polygon layers
-        for n, c in zip(['include', 'exclude'], [(0, 1, 1), (1, 0, 0)]):
-            if len(maskpaths) > 1: # we're working on a stack
-                l = viewer.add_shapes(None, ndim=3,
-                                name=n,
-                                edge_color=np.array(c),
-                                face_color=np.array((1, 1, 1, 0)),  # transparent
-                                edge_width=2, opacity=0.5)
-            else: # this is a single layer
-                l = viewer.add_shapes(None, ndim=2,
-                                name=n,
-                                edge_color=np.array(c),
-                                face_color=np.array((1, 1, 1, 0)),  # transparent
-                                edge_width=2, opacity=0.5)
-            l.mode = 'add_polygon'
-
-def saveMasks(mode='Save to disk'):
+def saveMasks(mode='Save to file'):
     """
     Apply or save masks. Depending on the mode, these will be saved to disk or 
     applied (to nan masked pixels in the selected image), with the option to also
@@ -254,143 +121,15 @@ def saveMasks(mode='Save to disk'):
     viewer = napari.current_viewer()  # get viewer
 
     # save masks to disk
-    if 'save' in mode.lower():
-        for l in viewer.layers:
-            if l.metadata.get('type', '') == 'MASK':
-                ndim = l.ndim
-                for i,p in enumerate(l.metadata.get('path',[])):
-                    if ndim == 2: # single 2D mask
-                        mask = hylite.HyImage( np.array( l.data ).T[...,None] )
-                    else: # slice from a stack of masks
-                        mask = hylite.HyImage( np.array( l.data[i] ).T[...,None] )
-                    mask.data = mask.data.astype(np.uint16) # N.B. cannot be uint8 otherwise we over-write our PNG files!!
-                    print("Saving mask to %s" % p )
-                    io.save(p, mask )
-        return
-    
-    # get mask
-    if 'mask' in viewer.layers:
-        l = viewer.layers['mask']
-        if l.metadata.get('type', '') == 'MASK':
-            ndim = l.ndim
-            for i,p in enumerate(l.metadata.get('path',[])):
-                if ndim == 2: # single 2D mask
-                    mask = hylite.HyImage( np.array( l.data ).T[...,None] )
-                else:
-                    napari.utils.notifications.show_warning("Only [cube] data can be masked in this way.")
-                    return
-                break
-        else:
-            napari.utils.notifications.show_warning("Invalid mask - please create it using 'Load/Init Masks'")
-            return
-    
-    if 'nan' in mode.lower(): # 'Set as nan'
-        # apply mask
-        if mask is not None:
-            msk = (mask.data[...,0] == 0).T
-            for l in viewer.layers:
-                if isinstance(l, napari.layers.Image ):
-                    if l.metadata.get('type', '') == 'HSIf':
-                        l.data = l.data.astype(np.float32) # nans are float
-                        l.data[ :, 
-                            msk[:l.data.shape[1], :l.data.shape[2]] ] = np.nan
-                        l.refresh()
-                    elif l.rgb or l.metadata.get('type','') == 'HSIp':
-                        l.data = l.data.astype(np.float32) # nans are float
-                        l.data[ msk[:l.data.shape[0], :l.data.shape[1]] , : ] = np.nan
-                        l.refresh()
-
-    if 'crop' in mode.lower(): # 'Nan and crop'
-        xmn = np.argmin( msk.all(axis=1) )
-        xmx = msk.shape[0] - np.argmin( msk.all(axis=1)[::-1] )
-        ymn = np.argmin( msk.all(axis=0) )
-        ymx = msk.shape[1] - np.argmin( msk.all(axis=0)[::-1] )
-        
-        for l in viewer.layers:
-            if isinstance(l, napari.layers.Image ):
-                if l.metadata.get('type', '') == 'HSIf':
-                    l.data = l.data[:,
-                                    xmn:min(xmx,l.data.shape[1]),
-                                    ymn:min(ymx,l.data.shape[2])] 
-                    l.refresh()
-                elif l.rgb or l.metadata.get('type','') == 'HSIp':
-                    l.data = l.data[xmn:min(xmx, l.data.shape[0]), 
-                                    ymn:min(ymx, l.data.shape[1]), :]
-                    l.refresh()
-            
-        # our mask is no longer the correct shape; remove!
-        for l in ['mask', 'exclude', 'include']:
-            if l in viewer.layers:
-                viewer.layers.remove(l)
-def updateMasks():
-    """
-    Update masks based on include and exclude polygons. These are then saved to disk
-    or 
-    """
-    viewer = napari.current_viewer()  # get viewer
-
-    # update selected layers
     for l in viewer.layers:
-        if l.metadata.get('type', '') == 'MASK':
-
-            # get masks for include and exclude
-            eMask = None
-            iMask = None
-            if 'exclude' in viewer.layers:
-                ndim = viewer.layers['exclude'].ndim
-                eMask = viewer.layers['exclude'].to_masks(l.data.shape)
-            if 'include' in viewer.layers:
-                ndim = viewer.layers['exclude'].ndim
-                iMask = viewer.layers['include'].to_masks(l.data.shape)
-            
-            if ndim == 2: # mask single image (easy)
-                mask = np.array( l.data )
-                if (eMask is not None) & len(eMask) > 0:
-                    sub = eMask[:,:mask.shape[0], :mask.shape[1]].any(axis=0)
-                    mask[sub] = 0
-                if (iMask is not None) & len(iMask) > 0:
-                    add = iMask[:,:mask.shape[0], :mask.shape[1]].any(axis=0)
-                    if add.any():
-                        mask[add] = 1
-                l.data = mask
-                l.refresh()
-
-            else: # mask image stack
-                stack=[]
-                for i in range(l.data.shape[0]):
-                    mask = np.array( l.data[i] )
-                    if (eMask is not None) and (len(eMask) > 0):
-                        sub = eMask[:,i, :mask.shape[0], :mask.shape[1]].any(axis=0)
-                        if sub.any():
-                            mask[sub] = 0
-                    if (iMask is not None) and (len(iMask) > 0):
-                        add = iMask[:,i, :mask.shape[0], :mask.shape[1]].any(axis=0)
-                        if add.any():
-                            mask[add] = 1
-                    stack.append(mask)
-
-                # rebuild dask stack
-                try:
-                    import dask.array
-                    import dask.delayed
-                except:
-                    napari.utils.notifications.show_warning(
-                        "Warning: stacked masks cannot be edited without dask installed.")
-                    return
-
-                shape = np.max([i.shape for i in stack], axis=0)
-                stack = dask.array.stack([dask.array.from_delayed(dask.delayed(i), shape=shape, dtype=i.dtype,
-                                                                ) for i in stack])
-
-                # update layer data
-                l.data = stack
-                l.refresh()
-
-    # clear exclude and include polygons
-    viewer.layers['exclude'].data = []
-    viewer.layers['include'].data = []
-
-    print("--")
+        if l.metadata.get('type', '') == 'Mask':
+            mask = getLayer(l, viewer=viewer)
+            if 'nan' in mode.lower():
+                mask.apply(crop='crop' in mode.lower())
+            elif 'save' in mode.lower():
+                mask.save()
+            else:
+                assert False, "Error - invalid mode %s"%mode
 
 def loadGeometry():
     """

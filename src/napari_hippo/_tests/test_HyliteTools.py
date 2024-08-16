@@ -1,40 +1,68 @@
 import os
 import pathlib
+import hylite
+from .fixtures import *
+import time
+import numpy as np
 
-from napari_hippo import HyliteToolsWidget
+@pytest.fixture
+def hyliteMode(imageMode):
+    """
+    Build a napari viewer with some test data in Image mode
+    """
+    # make a viewer (using other fixture)
+    def f():
+        # make viewer and add an image layer using our fixture
+        viewer, layer = imageMode() # get viewer and added image layer from fixture
+        
+        # create our widget, passing in the viewer, and add it to napari as a dock
+        from napari_hippo import HyliteToolsWidget
+        w = HyliteToolsWidget(viewer)
+        viewer.window.add_dock_widget(w)
 
+        time.sleep(0.1) # give some time for threads to sync (prevents strange bugs?)
 
-def test_HyliteToolsWidget(make_napari_viewer, capsys):
+        # return
+        return viewer, layer
+    return f
+
+def test_Calculate(hyliteMode, capsys):
     # make viewer and add an image layer using our fixture
-    viewer = make_napari_viewer()
+    viewer, layer = hyliteMode() # get viewer and added image layer from fixture
 
-    # create our widget, passing in the viewer, and add it to napari as a dock
-    w = HyliteToolsWidget(viewer)
-    viewer.window.add_dock_widget(w)
+    # check calculator
+    from napari_hippo._hyliteTools import calculate
+    viewer.layers.selection.clear()
+    viewer.layers.selection.add(layer) # select image layer
+    res = calculate( bands = "%d | %d | %d" % hylite.SWIR ) # extract an RGB composite
+    assert res[0].metadata['bands'] == 3
+    assert res[0].metadata['type'] == 'RGB'
 
-    from napari_hippo._hyliteTools import falseColor, hullCorrect, dimensionReduction, calculator
+    # check stretch
+    from napari_hippo._hyliteTools import stretch
+    for method in ['Percent clip', 'Percent clip (per band)']:
+        stretch(method=method)
+    stretch(method='Absolute', vmin=0.1, vmax=0.9)
 
-    def tests():
-        # tests to run on loaded image
-        # TODO - do better tests? This simply runs the functions...
-        for f in [falseColor, hullCorrect, dimensionReduction, calculator ]:
-            viewer.layers.selection.clear()
-            viewer.layers.selection.add(viewer.layers['image_full'])
-            f()
+    #viewer.show(block=True)
 
-    # load full HSI image
-    from napari_hippo import make_sample_data
-    data, kwds, _ = make_sample_data()[0]
-    kwds['name'] = 'image_full'
-    viewer.add_image(data, **kwds)
+def test_hullCorrect( hyliteMode, capsys ):
+    # make viewer and add an image layer using our fixture
+    viewer, layer = hyliteMode() # get viewer and added image layer from fixture
 
-    tests() # run test suite on this (in core) image
-
-    # load RGB only preview
-    from napari_hippo._ioTools import search
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.hdr', rgb_only=True)
-
-    # run test suite on this (out of core) image
-    tests()
-
+    from napari_hippo._hyliteTools import hullCorrect
+    hullCorrect()
+    assert '[HSICube] image(hc)' in viewer.layers
+    assert np.nanmax(viewer.layers['[HSICube] image(hc)'].data) <= 1.01
     # viewer.show(block=True)
+
+def test_dimReduce( hyliteMode, capsys ):
+    # make viewer and add an image layer using our fixture
+    viewer, layer = hyliteMode() # get viewer and added image layer from fixture
+
+    from napari_hippo._hyliteTools import dimensionReduction
+    dimensionReduction()
+    assert '[HSICube] image(PCA)' in viewer.layers
+    assert viewer.layers['[HSICube] image(PCA)'].metadata['bands'] == 5
+    #viewer.show(block=True)
+

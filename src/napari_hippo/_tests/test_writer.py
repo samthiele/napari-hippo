@@ -2,22 +2,19 @@ from napari_hippo import write_single_image, write_multiple
 import pathlib
 import os
 import numpy as np
-def test_writer_functions(make_napari_viewer, capsys):
+
+from .fixtures import *
+
+def test_writer_functions(imageMode, capsys):
 
     # setup some environment
-    viewer = make_napari_viewer()
+    viewer, layer = imageMode()
 
-    # add an image
-    from napari_hippo._ioTools import search
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.hdr',
-           rgb_only=False)  # this should load 1 test image
-
-    # save individual image
-    layer = viewer.layers['image']
+    # save image
     outpath = os.path.join( os.path.dirname(__file__), 'savetest.hdr')
     from napari_hippo._writer import write_single_image, write_multiple
     write_single_image( outpath, [(layer.data,
-                        dict(name = layer.name, metadata = layer.metadata), 'image')] )
+                        dict(name = layer.name, metadata = layer.metadata), '[cube] image')] )
     assert os.path.exists(outpath)
 
     # load image again and check that it matches

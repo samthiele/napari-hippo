@@ -1,13 +1,14 @@
 __version__ = "0.2.0"
 
-from ._util import n2h, h2n, getHyImage
+from ._base import *
 from ._reader import napari_get_ENVI_reader, napari_get_specim_reader
 from ._sample_data import make_sample_data
-from ._ioTools import IOWidget
-from ._crunchyTools import CrunchyToolsWidget
+from ._basicTools import BasicWidget
+from ._coregTools import CoregToolsWidget
 from ._hyliteTools import HyliteToolsWidget
 from ._fieldTools import FieldToolsWidget
 from ._caterpillarWidget import CaterpillarWidget
+from ._annotationTools import AnnotToolsWidget
 from ._writer import write_multiple, write_single_image
 
 __all__ = (
@@ -16,11 +17,12 @@ __all__ = (
     "write_single_image",
     "write_multiple",
     "make_sample_data",
-    "IOWidget",
-    "CrunchyToolsWidget",
+    "BasicWidget",
+    "CoregToolsWidget",
     "HyliteToolsWidget",
     "FieldToolsWidget",
-    "CaterpillarWidget"
+    "CaterpillarWidget",
+    "AnnotToolsWidget",
 )
 
 # setup plugin callbacks
@@ -30,6 +32,9 @@ viewer = napari.current_viewer()  # get viewer
 
 def update_slider(event):
     viewer.text_overlay.text = '' # no overlay
+    if getMode(napari.current_viewer()) == 'Batch':
+        viewer.text_overlay.text = '[Batch Mode]' # flag that napari is in batch mode
+
     step = viewer.dims.current_step[0]
     # check layers in selection, then entire tree
     for layers in [list(viewer.layers.selection), list(viewer.layers)]:

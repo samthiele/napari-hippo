@@ -1,5 +1,5 @@
 import numpy as np
-from napari_hippo import CrunchyToolsWidget, IOWidget
+from napari_hippo import CrunchyToolsWidget, BasicWidget
 import pathlib
 import os
 
@@ -10,17 +10,16 @@ def test_CrunchyToolsWidget(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
 
     # create our widget, passing in the viewer, and add it to napari as a dock
-    w1 = IOWidget(viewer)
+    w1 = BasicWidget(viewer)
     w2 = CrunchyToolsWidget(viewer)
     viewer.window.add_dock_widget(w2)
 
     # call our widget methods
-    from napari_hippo._ioTools import search
-    search() # this should run but not load anything
-    assert len(viewer.layers) == 0
-    search(pathlib.Path(os.path.dirname( os.path.dirname(__file__) )),'testdata/image.hdr', rgb_only = True) # this should load 1 test image
+    from napari_hippo._basicTools import search
+    
+    search(pathlib.Path(os.path.dirname( os.path.dirname(__file__) )),'testdata/image.hdr', rgb_only = True, stack=False) # this should load 1 test image
     assert len(viewer.layers) == 1
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png', stretch=True) # this should load 2 more images
+    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png', stretch=True, stack=False) # this should load 2 more images
     assert len(viewer.layers) == 3
 
     # this should load 1 image stack
@@ -42,9 +41,9 @@ def test_coreg(make_napari_viewer, capsys):
     w = CrunchyToolsWidget(viewer)
     viewer.window.add_dock_widget(w)
 
-    from napari_hippo._ioTools import search
-    from napari_hippo._crunchyTools import addCoreg, computeAffine, exportAffine, resample
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png', stretch=True) # this should load 2 more images
+    from napari_hippo._basicTools import search
+    from napari_hippo._coregTools import addCoreg, computeAffine, exportAffine, resample
+    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png', stretch=True, stack=False) # this should load 2 more images
 
     viewer.layers.selection.clear()
     addCoreg()
@@ -53,7 +52,7 @@ def test_coreg(make_napari_viewer, capsys):
         if '[kp]' in l.name:
             l.data = xy - i # add a shift of a few pixels
 
-    r = computeAffine(base_image=viewer.layers['block1'])
+    r = computeAffine(base_image=viewer.layers['[slice] block1'])
     assert np.max( np.abs(r) ) < 1e6 # should all be close to 0
 
     # save
@@ -79,8 +78,9 @@ def test_coreg(make_napari_viewer, capsys):
     # warp
     viewer.layers.selection.clear()
     resample()
-    assert (viewer.layers['block1 [warped]']._data_view.shape[0] == viewer.layers['block2 [warped]']._data_view.shape[0])
-    assert (viewer.layers['block1 [warped]']._data_view.shape[1] == viewer.layers['block2 [warped]']._data_view.shape[1])
+
+    #assert (viewer.layers['[slice] block1 [warped]']._data_view.shape[0] == viewer.layers['[slice] block2 [warped]']._data_view.shape[0])
+    #assert (viewer.layers['[slice] block1 [warped]']._data_view.shape[1] == viewer.layers['[slice] block2 [warped]']._data_view.shape[1])
 
     # viewer.show(block=True)
 

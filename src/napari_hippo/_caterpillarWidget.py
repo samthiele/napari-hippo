@@ -20,7 +20,7 @@ from magicgui import magicgui
 import napari
 
 from ._guiBase import GUIBase
-from napari_hippo import getHyImage
+from napari_hippo import getLayer
 import pathlib
 import hylite
 import os
@@ -84,9 +84,10 @@ class Caterpillar(QWidget):
 
     def update_plot(self, event):
         # get image
-        image, _ = getHyImage(self.viewer, layer=self.image_layer)
+        image = getLayer(self.image_layer, viewer=self.viewer)
         if image is None:
             return
+        image = image.toHyImage()
 
         # clear / reset plot
         self.canvas.axes.clear()
@@ -134,7 +135,7 @@ class CaterpillarWidget(GUIBase):
         self._add([self.export_widget], 'Export library')
 
 
-def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=True, quartiles=True ):
+def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=False, quartiles=False ):
     """
     Add a spectral caterpillar plot window and associated query points layer.
     Args:
@@ -149,6 +150,11 @@ def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.l
 
     """
     viewer = napari.current_viewer()
+    image = getLayer( base_image )
+    if (image is None) or (image.ndim() != 3):
+        napari.utils.notifications.show_warning(
+        "Please select a valid HSICube image.")
+        return
 
     # get points
     widget = Caterpillar(viewer, base_image, query_points, median, quartiles )
@@ -165,9 +171,12 @@ def export( base_image : 'napari.layers.Image',
     viewer = napari.current_viewer()
 
     # get image
-    image, _ = getHyImage(viewer, layer=base_image)
-    if image is None:
+    image = getLayer( base_image, viewer=viewer )
+    if (image is None) or (image.ndim() != 3):
+        napari.utils.notifications.show_warning(
+        "Please select a valid HSICube image.")
         return
+    image = image.toHyImage()
 
     # assembl spectral library
     indices = []

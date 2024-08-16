@@ -1,25 +1,18 @@
 import os
 import pathlib
 import numpy as np
+import napari_hippo
 from napari_hippo import CaterpillarWidget
+from .fixtures import *
+from pathlib import Path
 
-def test_CaterpillarWidget(make_napari_viewer, capsys):
+def test_CaterpillarWidget(imageMode, capsys):
     # make viewer and add an image layer using our fixture
-    viewer = make_napari_viewer()
+    viewer, layer = imageMode()
 
     # create our widget, passing in the viewer, and add it to napari as a dock
     w = CaterpillarWidget(viewer)
     viewer.window.add_dock_widget(w)
-
-    # load full HSI image
-    from napari_hippo import make_sample_data
-    data, kwds, _ = make_sample_data()[0]
-    kwds['name'] = 'image_full'
-    viewer.add_image(data, **kwds)
-
-    # load RGB only preview
-    from napari_hippo._ioTools import search
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.hdr', rgb_only=True)
 
     # add points
     pxy = np.random.rand(3, 2) * 15
@@ -27,10 +20,13 @@ def test_CaterpillarWidget(make_napari_viewer, capsys):
 
     # plot caterpillar
     from napari_hippo._caterpillarWidget import addCaterpillar
-    image1 = viewer.layers['image_full']
-    image2 = viewer.layers['image']
-
-    addCaterpillar(image1, points) # plot with fully loaded HSI
-    addCaterpillar(image2, points) # plot with out-of-core HSI
-
-    # viewer.show(block=True)
+    addCaterpillar(layer, points) # plot with fully loaded HSI
+    
+    # check export
+    from napari_hippo._caterpillarWidget import export
+    pth = os.path.join(os.path.dirname( napari_hippo.testdata.image ), 'testlib.csv' )
+    export(base_image = layer, 
+            query_points = viewer.layers['Points'], filename = Path(pth) )
+    assert os.path.exists(pth)
+    os.remove(pth) # cleanup
+    #viewer.show(block=True)

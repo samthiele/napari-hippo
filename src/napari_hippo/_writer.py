@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 import napari
 import hylite
-from napari_hippo import getHyImage
+from napari_hippo import getLayer
 
 def write_single_image(path: str, data: List[FullLayerData] ) -> List[str]:
     """Writes a single image layer"""
@@ -25,9 +25,9 @@ def write_single_image(path: str, data: List[FullLayerData] ) -> List[str]:
     for d, attr, t in data:
         name = attr['name']
         if name in viewer.layers:
-            image, layer = getHyImage( viewer, viewer.layers[name] )
+            image = getLayer( viewer.layers[name] )
             if image is not None:
-                hylite.io.save(path, image)
+                hylite.io.save(path, image.toHyImage())
                 out.append(path)
 
     if len(out) == 0:

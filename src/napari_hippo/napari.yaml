@@ -17,18 +17,21 @@ contributions:
     - id: napari-hippo.make_sample_data
       python_name: napari_hippo._sample_data:make_sample_data
       title: Load sample data from Hippo
-    - id: napari-hippo.make_IOTools
-      python_name: napari_hippo._ioTools:IOWidget
-      title: Load and save hyperspectral datasets
-    - id: napari-hippo.make_crunchyTools
-      python_name: napari_hippo._crunchyTools:CrunchyToolsWidget
-      title: Some crunchy tools for data munging
+    - id: napari-hippo.make_BasicTools
+      python_name: napari_hippo._basicTools:BasicWidget
+      title: Basic IO and masking operations
+    - id: napari-hippo.make_AnnotTools
+      python_name: napari_hippo._annotationTools:AnnotToolsWidget
+      title: Define and extract ROIs and keypoints
+    - id: napari-hippo.make_coregTools
+      python_name: napari_hippo._coregTools:CoregToolsWidget
+      title: Some coregistration tools for data munging
     - id: napari-hippo.make_hyliteTools
       python_name: napari_hippo._hyliteTools:HyliteToolsWidget
       title: Basic hyperspectral data analysis
     - id: napari-hippo.make_fieldTools
       python_name: napari_hippo._fieldTools:FieldToolsWidget
-      title: Quick field checks
+      title: Quick tools for tripod scanning
     - id: napari-hippo.make_caterpillar
       python_name: napari_hippo._caterpillarWidget:CaterpillarWidget
       title: Spectral viewer
@@ -51,13 +54,15 @@ contributions:
       display_name: Hippo HSI
       key: unique_id.1
   widgets:
-    - command: napari-hippo.make_IOTools
-      display_name: Input / Output
-    - command: napari-hippo.make_crunchyTools
-      display_name: Crunchy
+    - command: napari-hippo.make_BasicTools
+      display_name: Basic
+    - command: napari-hippo.make_AnnotTools
+      display_name: Annotate
     - command: napari-hippo.make_hyliteTools
       display_name: Hylite
+    - command: napari-hippo.make_coregTools
+      display_name: Coregister
     - command: napari-hippo.make_fieldTools
-      display_name: Field QAQC
+      display_name: Tripod
     - command: napari-hippo.make_caterpillar
       display_name: Caterpillar
