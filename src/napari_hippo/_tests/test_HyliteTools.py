@@ -54,7 +54,7 @@ def test_hullCorrect( hyliteMode, capsys ):
     hullCorrect()
     assert '[HSICube] image(hc)' in viewer.layers
     assert np.nanmax(viewer.layers['[HSICube] image(hc)'].data) <= 1.01
-    # viewer.show(block=True)
+    #viewer.show(block=True)
 
 def test_dimReduce( hyliteMode, capsys ):
     # make viewer and add an image layer using our fixture
@@ -66,3 +66,30 @@ def test_dimReduce( hyliteMode, capsys ):
     assert viewer.layers['[HSICube] image(PCA)'].metadata['bands'] == 5
     #viewer.show(block=True)
 
+def test_combine( hyliteMode, capsys):
+    viewer, layer = hyliteMode() # get viewer and added image layer from fixture
+    from napari_hippo._hyliteTools import combine
+    from napari_hippo._base import HSICube
+    
+    # create a second image and select it
+    img2 = HSICube(layer).toHyImage()
+    img2.data = img2.data*2
+    I2 = HSICube.construct( img2, 'image2', viewer=viewer)
+    viewer.layers.select_all()
+
+    # test function
+    combine()
+
+    # check it worked
+    if '[HSICube] image(median)' in viewer.layers:
+        l2 = viewer.layers['[HSICube] image(median)']
+    elif '[HSICube] image2(median)' in viewer.layers:
+        l2 = viewer.layers['[HSICube] image2(median)']
+    else:
+        assert False, "No output?"
+    
+    A = HSICube(l2).toHyImage()
+    delta = np.nanmean( A.data / img2.data )
+    assert np.abs( delta - 0.75) < 1e-6
+
+    #viewer.show(block=True)

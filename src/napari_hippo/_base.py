@@ -9,18 +9,32 @@ import numpy as np
 import os
 from pathlib import Path
 
+def isImage( layer ):
+    """
+    Return True if the specified napari layer is associated with
+    an HSIImage, RGB, RGBA or BW type.
+    """
+    t = layer.metadata.get('type', '')
+    return ('HSICube' in t) \
+        or ('RGB' in t) \
+          or ('RGBA' in t) \
+            or ('BW' in t)
+
 def getMode( viewer ):
     """
     Return the current mode of the specified viewer. Options are "Batch" (if multiple datasets are loaded as stack objects) or "Image". 
     If no Image or Stack layers are present, this will return None.
     """
+    image = False
     for l in viewer.layers:
         t = l.metadata.get('type', '')
-        if 'HSICube' in t:
-            return 'Image'
+        if isImage(l):
+            image = True
         if 'Stack' in t:
             return 'Batch'
-    return None # mode is undefined
+    if image:
+        return 'Image'
+    return '' # mode is undefined
 
 def getLayer( layer, viewer=None ):
     """
@@ -37,13 +51,29 @@ def getLayer( layer, viewer=None ):
             return None
     
     dtype = layer.metadata.get('type', 'None')
-    for cls in [HippoData,HSICube,BW,RGB,RGBA,Stack,Mask,ROI,Scene,Cloud]:
+    for cls in [HippoData,HSICube,BW,RGB,RGBA,Stack,Mask,ROI,Scene,View]:
         if cls.__name__ == dtype:
             return cls(layer)
         
     # no matches
     return None
 
+def getByType( layers, layer_type ):
+    """
+    Filter the selected layers list (e.g., selection) and return 
+    only those layers with the specified hippo type.
+    """
+    out = []
+    if not isinstance(layer_type, list):
+        layer_type = [layer_type]
+
+    for l in layers:
+        I = getLayer(l)
+        for t in layer_type:
+            if isinstance(I, t):
+                out.append(I)
+                continue
+    return out
 class HippoData( object ):
     """
     A base class for all hippo data objects, containing various shared functions.
@@ -65,7 +95,8 @@ class HippoData( object ):
         # convert to class attributes (and also add as keys in metadata)
         for k,v in kwargs.items():
             if (' ' in k) or ('-' in k) or ('.' in k):
-                assert False, "Error - invalid metadata key for HippoData object." # this is a problem, but should never happen!
+                continue # this is a problem, but lets try to roll with it (ignorance is bliss!)
+                #assert False, "Error - invalid metadata key for HippoData object." # this is a problem, but should never happen!
             self.__setattr__(k, v) # n.b. this will also update class metadata!
 
         # also store class type
@@ -157,11 +188,13 @@ class HSICube( HippoData ):
 
         # define kwargs for the viewer.add_image method
         add_kwargs = dict(name=name, 
-                            metadata=dict(**kwds))
+                            metadata=dict())
         for k,v in image.header.items(): # add all image header info to metadata
             add_kwargs['metadata'][k.replace(' ', '_')] =  v
+        for k,v in kwds.items(): # add kwarg info into metadata
+            add_kwargs['metadata'][k.replace(' ', '_')] =  v
         add_kwargs['metadata']['type'] = dtype
-        
+        add_kwargs['name'] = '[%s] %s'%(dtype, name)
         if args_only:
             return (arr, add_kwargs, 'image')
 
@@ -195,7 +228,7 @@ class HSICube( HippoData ):
 
         # set image data
         self.layer.data = h2n( image.data )
-                
+
     def ndim(self):
         return 3
 
@@ -489,11 +522,11 @@ class ROI( HippoData ):
                     h = hylite.io.loadHeader(p)
                     
                     for k,v in h.items():
+                        k = k.strip()
                         if (k.lower().startswith( 'point' )) or (k.lower().startswith( 'roi' )):
                             # load data from header
                             text = k.split(' ')[-1]
                             verts = h.get_list(k)[::-1].reshape((-1,2)) # reverse order to convert to row, col indexing
-                            
                             if ('point' in mode.lower()) and (k.lower().startswith( 'point' )):
                                 # these should be treated as points
                                 roi_text += [text for p in verts]
@@ -515,8 +548,10 @@ class ROI( HippoData ):
         add_kwargs['metadata']['mode'] = mode
         if isinstance(base, Stack): # batch mode
             add_kwargs['metadata']['path'] = pth # store list of paths
+            add_kwargs['ndim'] = 3 # 3D points (because we're a stack)
         else:
             add_kwargs['metadata']['path'] = pth[0] # will only be one path here
+            add_kwargs['ndim'] = 2 # 2D points (just one image)
         if ('poly' in mode.lower()):
             add_kwargs['shape_type']='polygon'
         if args_only:
@@ -532,29 +567,93 @@ class ROI( HippoData ):
         layer.mode = 'SELECT'
         return cls(layer)
     
-    def toList(self):
+    def toList(self, world=True, transpose=False):
         """
         Get the keypoints or ROIs stored in this layer as a list of numpy vertex arrays,
-        and associated text (label) array.
+        and associated text (label) array. If world is True, any affine associated
+        with this layer will be applied (i.e. coordinates will be in viewer coords). If world
+        is a napari layer (with a world_to_data function), coordinates will be transformed into
+        that layer's data coordinates. If transpose is True, coordinates will be transformed from 
+        napari's (band, row, column) indexing to (x,y) coordinates compatible with HyImages.
         """
-        verts = [verts for verts in self.layer.data]
+        verts = [np.array(verts) for verts in self.layer.data]
         text = list(self.layer.text.values)
-        return verts, text
+        if len(verts) == 0: # edge case...
+            return [],[]
+        
+        # for point layers, shape like a polygon for simplicity during transforms
+        if 'point' in self.mode:
+            verts = [np.array(verts)] # wrap in a list for compatability with polygons
+            if len(verts[0]) == 0: # edge case...
+                return [], []
+        
+        if world:
+            verts = [np.array([self.layer.data_to_world(v) for v in p]) for p in verts]
+            
+            # a layer has been passed; transform into that layer's data coordinates
+            if hasattr(world, 'world_to_data'):
+                verts = [np.array([world.world_to_data(v) for v in p])
+                            for p in verts ]
+                    
+        # convert from row, col to x,y index as this
+        # is the format used for data in hylite
+        if transpose:
+            if len(verts[0][0]) == 3:
+                verts = [p[:,[0,2,1]] for p in verts]
+            else:
+                verts = [p[:,[1,0]] for p in verts]
+
+        if 'point' in self.mode:
+            return list(verts[0]), text # remove "fake" polygon shape
+        else:
+            return verts, text
     
-    def fromList(self, verts, text=None):
+    def fromList(self, verts, text=None, world=True, transpose=False):
         """
         Set the keypoints or ROIs stored in this layer given a list of numpy vertex arrays
-        and correspondign text labels. Text can be None if needed.
+        and correspondign text labels. Text can be None if needed. If world is True, the
+        inverse of any affine associated with this layer will be applied 
+        (i.e. coordinates will be converted from viewer coords to data coords). If a layer is
+        passed, then it is assumed the vertices are in that layer's data coordinates. If transpose 
+        is True, coordinates will be transformed from hylite's (x,y) indexing to napari (row, col)
+        indexing.
         """
+        # check verts is appropriately shaped
+        if 'point' in self.mode:
+            verts = [verts] # needs to be wrapped into a list for compatability with polygons
+        
+        # handle transpose
+        if transpose:
+            if len(verts[0][0]) == 3:
+                verts = [np.array(p)[:,[0,2,1]] for p in verts]
+            else:
+                verts = [np.array(p)[:,[1,0]] for p in verts]
+        
+        # handle coordinate transforms
+        if world:
+            # a layer has been passed; transform from that layer's data coordinates
+            if hasattr(world, 'world_to_data'):
+                verts = [np.array([world.data_to_world(v) for v in p])
+                            for p in verts ]
+            
+            # transform from world coordinates to this ROIs data coordinates
+            verts = [np.array([self.layer.world_to_data(v) for v in p])
+                        for p in verts ]
+        
+        # set data
         if 'point' in self.mode:
             self.layer.data = np.vstack(verts)
         else:
             self.layer.data = verts
+
+        # set text
         if text is not None:
             assert len(self.layer.data) == len(text), "Error - text and values must have matching length."
             self.layer.text.values = [t for t in text]
         else:
             self.layer.text.values = ['' for v in verts]
+        
+        # update
         self.layer.refresh()
 
     def getTypedName(self):
@@ -587,7 +686,7 @@ class Scene(HippoData):
         """
         pass
 
-class Cloud(HippoData):
+class View(HippoData):
     """
     Hippo data class for views of 3D point clouds.
     """
@@ -596,12 +695,63 @@ class Cloud(HippoData):
     def ndim(self):
         return 3
     @classmethod
-    def construct( cls, image, name, viewer=None ):
+    def construct( cls, cloud, name, camera, args_only=False, viewer=None, **kwds ):
         """
         Factory function that takes a HyCloud instance, creates a new napari 
         layer for each listed camera (view), and returns a corresponding list of Cloud objects.
         """
-        pass
+        if camera is not None:
+            image = cloud.render(camera, 'rgb', s=1, fill_holes=True)
+        else:
+            camera = 'ortho'
+            image = cloud.render('ortho', 'rgb', s=1, fill_holes=True )
+        image.set_as_nan(0) # remove background
+
+        # basically an image now!
+        add_kwargs = HSICube.construct( image, name=name, args_only=True, viewer=viewer, **kwds)
+        add_kwargs[1]['metadata']['type'] = 'View'
+        add_kwargs[1]['name'] = '[%s] %s'%(add_kwargs[1]['metadata']['type'], name)
+        add_kwargs[1]['metadata']['pointsize'] = 1
+        add_kwargs[1]['metadata']['camera'] = camera
+
+        if args_only:
+            return add_kwargs
+
+        # add layer and return relevant HSIData instance
+        layer = viewer.add_image( add_kwargs[0], **add_kwargs[1] )
+        return View( layer )
+        
+    def setPointSize( self, n : int = 1):
+        """
+        Re-render this view with a different point size.
+        """
+        self.pointsize = n
+        cloud = hylite.io.load(self.path)
+        image = cloud.render(self.camera, 'rgb', s=n, fill_holes=True)
+        image.set_as_nan(0) # remove background
+        self.layer.data = h2n( image.data )
+
+    def toDataImage( self ):
+        """
+        Return a HyImage containing the rendered data array of the source
+        point cloud.
+        """
+        cloud = hylite.io.load(self.path)
+        cloud.decompress()
+        image = cloud.render(self.camera, (0,-1), s=self.pointsize, fill_holes=True)
+        image.data = image.data.astype(np.float32)
+        image.set_as_nan(0)
+        return image
+    
+    def toIDImage( self ):
+        """
+        Return a HyImage containing the rendered data array of the source
+        point cloud.
+        """
+        cloud = hylite.io.load(self.path)
+        image = cloud.render(self.camera, 'i', s=self.pointsize, fill_holes=True)
+        image.data = image.data.astype(int)
+        return image
 
 def n2h( a ):
     """

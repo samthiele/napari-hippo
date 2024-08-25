@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from napari_hippo import napari_get_ENVI_reader, napari_get_specim_reader, h2n
+from napari_hippo import napari_get_hylite_reader, napari_get_specim_reader, h2n
 import napari_hippo.testdata
 from hylite import io
 
@@ -24,7 +24,7 @@ def test_ENVI_reader(tmp_path, make_napari_viewer):
 
         # get napari reader for the same file
         for original, force_rgb in zip([original_data, original_data_rgb], [False, True]):
-            reader = napari_get_ENVI_reader(p)
+            reader = napari_get_hylite_reader(p)
             assert callable(reader)
 
             # make sure we're delivering the right format
@@ -55,8 +55,21 @@ def test_specim_reader():
         layer_data_tuple = layer_data_list[0]
         assert isinstance(layer_data_tuple, tuple) and len(layer_data_tuple) > 0
 
+def test_hypercloud_reader(make_napari_viewer):
+    # make a viewer
+    viewer = make_napari_viewer()
+    
+    reader = napari_get_hylite_reader(napari_hippo.testdata.cloud)
+    layer_data_list = reader(napari_hippo.testdata.cloud, force_rgb=False )
+    for args in layer_data_list:
+        viewer.add_image(args[0], **args[1])
+
+    assert '[View] hypercloud' in viewer.layers
+    
+    #viewer.show(block=True)
+
 def test_get_reader_pass():
-    reader = napari_get_ENVI_reader("fake.file")
+    reader = napari_get_hylite_reader("fake.file")
     assert reader is None
 
     reader = napari_get_specim_reader("fake.file")

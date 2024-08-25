@@ -12,40 +12,59 @@ import numpy as np
 
 from magicgui import magicgui
 import napari
+from napari.experimental import link_layers
+
 from ._guiBase import GUIBase
+from scipy.spatial import distance_matrix
 
 from skimage.transform import AffineTransform, warp
 from skimage.measure import ransac
-
-from napari_hippo import getHyImage, h2n, n2h
-
+from napari_hippo import getHyImage, h2n, n2h, getLayer, getMode, isImage, ROI
 import pathlib
 class CoregToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 
-        self.scale_widget = magicgui(scale, call_button='Scale',
-                                     x_scale = {"min" : -np.inf, "max" : np.inf },
-                                     y_scale={"min": -np.inf, "max": np.inf} )
-        self.translate_widget = magicgui(translate, call_button='Translate',
-                                         x = {"min" : -np.inf, "max" : np.inf },
-                                         y={"min": -np.inf, "max": np.inf} )
-        self.rot_widget = magicgui(rot, call_button='Rotate', angle = {"min" : -np.inf, "max" : np.inf } )
-        self._add([self.scale_widget, self.translate_widget,
-                   self.rot_widget], 'Simple Transforms')
+        self.simpleT_widget = magicgui( simpleT, call_button="Transforms")
+        self._add([self.simpleT_widget], 'Simple Transforms')
 
-        self.coreg_widget  = magicgui(addCoreg, call_button='Add Target(s)')
-        self.affine_widget = magicgui(computeAffine, call_button='Align images')
-        self.export_affine_widget = magicgui(exportAffine, call_button='Save affine')
-        self._add([ self.coreg_widget,
-                    self.affine_widget,
-                    self.export_affine_widget], 'Coregister')
+        self.addKP_widget  = magicgui(addKP, call_button='Add/Load Target(s)')
+        self.sortKP_widget = magicgui(matchKP, call_button='Match New KPs')
+        self._add([ self.addKP_widget,
+                    self.sortKP_widget], 'Coregister')
 
         self.resample_widget = magicgui(resample, call_button='Apply Affine')
         self._add([ self.resample_widget], "Resample" )
 
         # add spacer at the bottom of panel
         self.qvl.addStretch()
+
+def simpleT():
+    """
+    Build a side-panel for applying simple transformations.
+    """
+    if checkMode():
+        viewer = napari.current_viewer()
+        viewer.window.add_function_widget(scale, 
+                                        magic_kwargs=dict(call_button='Scale',
+                                        x_scale=dict(min=-np.inf, max=np.inf, step=0.005),
+                                        y_scale=dict(min=-np.inf, max=np.inf, step=0.005) 
+                                        ),
+                                        name="Scale",
+                                        area='left')
+        viewer.window.add_function_widget(translate, 
+                                        magic_kwargs=dict(call_button='Translate',
+                                        x=dict(min=-np.inf, max=np.inf, step=0.01),
+                                        y=dict(min=-np.inf, max=np.inf, step=0.01) 
+                                        ),
+                                        name="Translate",
+                                        area='left')
+        viewer.window.add_function_widget(rot, 
+                                        magic_kwargs=dict(call_button='Rotate',
+                                        angle=dict(min=-np.inf, max=np.inf, step=0.005),
+                                        ),
+                                        name="Rotate",
+                                        area='left')
 
 def scale( x_scale : float = -1, y_scale : float = -1 ):
     """
@@ -157,7 +176,133 @@ def rot( angle : float = 90 ):
             affine[1, 1] = np.cos(np.deg2rad(angle))
         l.affine = np.dot( affine, A )
 
-def addCoreg():
+def checkMode():
+    """
+    Ensure we don't do anything crazy in batch mode.
+    """
+    if getMode(napari.current_viewer()) != 'Image':
+        napari.utils.notifications.show_error(
+            "Coregistration does not work in Batch mode. Delete any [Stack] layers." )
+        return False
+    return True
+
+def addKP():
+    """
+    Add / load editable keypoints layers for the selected layers.
+    """
+    if checkMode():
+        viewer = napari.current_viewer()
+        layers = viewer.layers.selection
+        if len(layers) == 0:
+            layers = viewer.layers
+        
+        out = []
+        for l in viewer.layers:
+            if isImage(l):
+                # N.B. this will load keypoint from header files
+                # if they are defined! :-) 
+                out.append( ROI.construct(l, mode='point', viewer=viewer).layer )
+                out[-1].mode = 'ADD'
+
+                # link to allow easier toggling
+                link_layers( [out[-1], l], ('visible',) )
+
+                # TODO - get image and check for affine matrix
+
+        return out 
+    return []
+
+def matchKP():
+    """
+    Sort any unlabeled keypoints and name them based on a
+    radial matching algorithm.
+    """
+    if checkMode():
+        viewer = napari.current_viewer()
+        layers = viewer.layers.selection
+        if len(layers) == 0:
+            layers = viewer.layers
+        
+        # get keypoint layers
+        R = [getLayer(l) for l in layers if l.metadata.get('type','') == 'ROI']
+        if len(R) < 2:
+            napari.utils.notifications.show_error(
+            "Select multiple keypoint layers to match." )
+            return
+
+        # build dictionary of un-named points
+        points = {}
+        for k in R:
+            verts, text = k.toList()
+            verts = np.array([p for p,t in zip(verts,text) if t == '']) # unlabelled points
+            ixx = [i for i,t in enumerate(text) if t == ''] # corresponding indices
+            if len(verts) == 0:
+                continue # no un-named keypoints here
+            elif len(verts) == 1:
+                angle = [0]
+            else:
+                v = verts - np.mean(verts, axis=0) # location relative to mean
+                angle = np.arctan2(v[:, 0], v[:, 1])
+            
+            points[k] = (angle, ixx, verts ) # store angles
+
+        # get reference names and angles
+        # (from the smallest point cloud)
+        ref_angle = None
+        mincount = np.inf
+        ref = k
+        for k,(angle,idx,verts) in points.items():
+            if (verts.shape[0] < mincount) and (verts.shape[0] > 0):
+                ref_angle = angle
+                mincount = verts.shape[0]
+                names = np.array(["kp%d%d"%(p[0],p[1]) for p in verts])
+
+        # do matching
+        for k,(angle,idx,verts) in points.items():
+            if (k == ref):
+                match = names # easy!
+            else:
+                if len(angle) == 1:
+                    match = names # edge case
+                else:
+                    distances = distance_matrix( angle[:,None], ref_angle[:,None] )
+                    match = names[np.argmin( distances, axis=1)]
+            
+            # store matches
+            used = []
+            text = [str(v) for v in k.layer.text.values]
+            for i,m in zip(idx,match):
+                if m not in used:
+                    text[i] = str(m)
+                    #k.layer.text.values[i] = m
+                    used.append(m)
+            k.layer.text.values = text # set text array
+            k.layer.refresh()
+
+def autoKP():
+    """
+    Use SIFT or ORB to automatically construct keypoints
+    for the selected layers.
+    """
+    if checkMode():
+        viewer = napari.current_viewer()
+        layers = viewer.layers.selection
+        if len(layers) == 0:
+            layers = viewer.layers
+
+def saveKP():
+    """
+    Save keypoints associated with the selected layers to 
+    disk.
+    """
+    if checkMode():
+        viewer = napari.current_viewer()
+        layers = viewer.layers.selection
+        if len(layers) == 0:
+            layers = viewer.layers
+
+
+def addCoregOld():
     """
     Create coregistration layers who's vertices can be adjusted to manually-identified keypoints.
     """

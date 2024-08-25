@@ -6,11 +6,11 @@ import numpy as np
 from hylite import io
 import glob
 import napari
-from napari_hippo import h2n, HSICube, getMode
+from napari_hippo import h2n, HSICube, getMode, View
 from hylite.io import loadHeader, matchHeader, loadSubset
 import hylite
 
-def napari_get_ENVI_reader(path):
+def napari_get_hylite_reader(path):
     """
     Load an ENVI file.
 
@@ -31,11 +31,11 @@ def napari_get_ENVI_reader(path):
 
     # if we know we cannot read the file, we immediately return None.
     for p in path:
-        if p.endswith(".hdr") or p.endswith(".dat"):
-            return read_ENVI
+        if p.endswith(".hdr") or p.endswith(".dat") or p.endswith(".ply"):
+            return read_hylite
         elif p.endswith(".png") or p.endswith(".jpg") or p.endswith(".jpeg") or p.endswith(".bmp"):
             return read_RGB
-
+    print("??")
     # otherwise we cannot read this
     return None
 
@@ -88,7 +88,7 @@ def _getkwags(image, name, path=None, dtype=None):
         add_kwargs['metadata']['path'] = path
     return add_kwargs
 
-def read_specim( path, return_image=False ):
+def read_specim( path, return_data=False ):
     """
     Read and preprocess a raw specim image. If return_image is True
     then this returns a HyImage result rather than an arguments tuple as expected
@@ -153,13 +153,13 @@ def read_specim( path, return_image=False ):
 
                 if image is not None:
                     # store add_image kwargs
-                    if return_image:
+                    if return_data:
                         out.append(image)
                     else:
                         out.append( HSICube.construct( image, os.path.basename(p), args_only=True, path=p ) )
     return out
 
-def read_RGB( path, force_rgb=True, return_image=False ):
+def read_RGB( path, force_rgb=True, return_data=False ):
     """
     Open one or more normal RGB images in .png, .jpg or .bmp format.
 
@@ -190,15 +190,15 @@ def read_RGB( path, force_rgb=True, return_image=False ):
         image.decompress()
 
         # store add_image kwargs
-        if return_image:
+        if return_data:
             out.append(image)
         else:
             out.append( HSICube.construct( image, name, args_only=True, path=p ) )
     return out
 
-def read_ENVI( path, force_rgb=False, return_image=False ):
+def read_hylite( path, force_rgb=False, return_data=False ):
     """
-    Open one or more ENVI images.
+    Open one or more hylite-compatible files (e.g., ENVI images, PLY point clouds, etc).
 
     Args:
         path: Path to the image to load
@@ -221,34 +221,50 @@ def read_ENVI( path, force_rgb=False, return_image=False ):
         # parse layer name
         name = os.path.splitext(os.path.basename(p))[0]
 
-        # load with hylite
-        p, _ = matchHeader(p) # make sure we have the path to the header file
+        # load header
+        p, d = matchHeader(p) # make sure we have the path to the header file
         h = io.loadHeader(p)
-        if force_rgb: # load image as RGB preview only
-            if 'default bands' in h:
-                bands = h.get_list('default bands').astype(int)
+
+        # load point cloud
+        if 'ply' in os.path.splitext(d)[1]: # load a point cloud
+            cloud = io.load( d )
+            cameras = set([int(k.split(' ')[1]) for k in cloud.header if 'camera' in k])
+            if len(cameras) == 0:
+                cameras = [0] # this will return None later, which will in turn end up as a nadir view
+            if return_data:
+                out.append(cloud)
             else:
-                # defaults
-                n = h.band_count()
-                bands = np.array([0.25 * n, 0.5 * n, 0.75 * n]).astype(int)
+                for i in cameras:
+                    # store add_image kwargs
+                    out.append( View.construct( cloud, name, cloud.header.get_camera(i), args_only=True, path=p))
+        elif 'hyc' in os.path.splitext(d)[1]: # load a scene
+            assert False # not implemented
+        else: # assume this is an image
+            if force_rgb: # load image as RGB preview only
+                if 'default bands' in h:
+                    bands = h.get_list('default bands').astype(int)
+                else:
+                    # defaults
+                    n = h.band_count()
+                    bands = np.array([0.25 * n, 0.5 * n, 0.75 * n]).astype(int)
 
-                # try better combo
-                for bands in [hylite.RGB, hylite.VNIR, hylite.SWIR, hylite.MWIR, hylite.LWIR]:
-                    if (np.min(bands) > np.min(image.get_wavelengths())):
-                        if (np.max(bands) < np.max(image.get_wavelengths())):
-                            try:
-                                bands = np.array([image.get_band_index(b) for b in bands])
-                            except:
-                                pass # don't worry if there isn't the target band
-            image = loadSubset( p, bands=bands )
-        else: # load full image
-            image = io.load( p )
-        image.decompress()
+                    # try better combo
+                    for bands in [hylite.RGB, hylite.VNIR, hylite.SWIR, hylite.MWIR, hylite.LWIR]:
+                        if (np.min(bands) > np.min(image.get_wavelengths())):
+                            if (np.max(bands) < np.max(image.get_wavelengths())):
+                                try:
+                                    bands = np.array([image.get_band_index(b) for b in bands])
+                                except:
+                                    pass # don't worry if there isn't the target band
+                image = loadSubset( p, bands=bands )
+            else: # load full dataset
+                image = io.load( p )
+            image.decompress()
         
-        # store add_image kwargs
-        if return_image:
-            out.append(image)
-        else:
-            out.append( HSICube.construct( image, name, args_only=True, path=p ) )
-
+            # store add_image kwargs
+            if return_data:
+                out.append(image)
+            else:
+                out.append( HSICube.construct( image, name, args_only=True, path=p ) )
     return out
+

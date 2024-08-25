@@ -6,7 +6,7 @@ import numpy as np
 from natsort import natsorted
 import glob
 import napari
-from napari_hippo import napari_get_ENVI_reader
+from napari_hippo import napari_get_hylite_reader
 from napari_hippo._base import *
 import os
 import hylite
@@ -24,11 +24,6 @@ class BasicWidget(GUIBase):
         self.save_mask_widget = magicgui(saveMasks, call_button='Save/Apply Masks', 
                                          mode={"choices": ['Save to file', 'Set as nan', 'Nan and crop']})
         self._add( [self.load_mask_widget, self.save_mask_widget], 'Mask' )
-
-        #self.updateGeometry_widget = magicgui(updateGeometry, call_button="Save/Load")
-        #self.exportPatch_widget = magicgui(exportPatches, call_button='Export Patches',
-        #                                     filename={"mode": "w", "filter":"*.hyc"})
-        #self._add( [self.updateGeometry_widget,self.exportPatch_widget], 'Geometry')
 
 def search( root : pathlib.Path = pathlib.Path(''),
             filter : str='*.png',
@@ -56,10 +51,10 @@ def search( root : pathlib.Path = pathlib.Path(''),
     images = []
     paths = []
     for f in file_list:
-        r = napari_get_ENVI_reader( f )
+        r = napari_get_hylite_reader( f )
         if r is not None:
             paths.append( f ) # store root path for stacked images
-            images += r( f, force_rgb=rgb_only, return_image=True )
+            images += r( f, force_rgb=rgb_only, return_data=True )
             
     if (len(images) == 0) & (getMode(napari.current_viewer()) != 'Batch'):
         napari.utils.notifications.show_warning("No files found.")
@@ -198,7 +193,6 @@ def loadGeometry():
                                       metadata=meta)
         roi_layer.mode = 'SELECT'
         
-
 def updateGeometry( name : str = 'napari' ):
     """
     Update the geometry of the selected layer based on the New ROIs and New Points layers. Creates these shape layers if needed.
@@ -360,129 +354,4 @@ def updateGeometry( name : str = 'napari' ):
                                 metadata=meta)
     new_roi.mode = 'add_polygon'
 
-def exportPatches( filename : pathlib.Path = pathlib.Path('.'),
-                   plot = True ):
-    """
-    Export each ROI to separate images, stored in a HyCollection directory structure. Spectral
-    libraries for any point data (and averages of each ROI) will also be created. If `plot` is True 
-    (default) then figures will be created showing these libraries.
-    """
-    if filename == '.':
-        napari.utils.notifications.show_warning("Please select a path to save output patches.")
-        return
-    
-    # get layers
-    viewer = napari.current_viewer()  # get viewer
-    layers = list(viewer.layers)
-
-    # get ROI and Points layer
-    points = None
-    roi = None
-    if 'Points' in viewer.layers:
-        points = viewer.layers['Points']
-    if 'ROI' in viewer.layers:
-        roi = viewer.layers['ROI']
-    if (points is None) and (roi is None):
-        napari.utils.notifications.show_warning("No Points or ROI layers found.")
-        return
-    
-    # create output HyCollection
-    O = hylite.HyCollection(os.path.basename(filename), os.path.dirname(filename))
-
-    # loop through images
-    for l in viewer.layers:
-        if 'type' in l.metadata:
-
-            # is this a stack?
-            if 'stack' in l.metadata['type'].lower():
-                paths = l.metadata['path']
-                #images = [io.load(p) for p in paths]
-                pass # not implemented yet
-
-            elif ('hsi' in l.metadata['type'].lower()) or \
-                    ('rgb' in l.metadata['type'].lower()):
-                if 'hsi' in l.metadata['type'].lower():
-                    image, _ = getHyImage(viewer, layer=l)
-                else:
-                    try: # look for an ENVI file with the same name
-                        image = io.load(os.path.splitext(l.metadata['path'])[0] + ".hdr" )
-                    except:
-                        continue # skip this one
-
-                img_name = os.path.splitext( os.path.basename( l.metadata['path'] ) )[0]
-
-                # extract points
-                if (points is not None) and (len(points.data) > 0):
-                    spectra = []
-                    names = []
-                    labels = points.text.values
-                    for i,(py,px) in enumerate(points.data):
-                        print("Extracting spectra from pixel (%d,%d) in image %s with %d bands"%(px,py,img_name, image.band_count()))
-                        if (px > 0) and (py > 0):
-                            if (px < image.xdim()) and (py < image.ydim()):
-                                spectra.append(image.data[int(px),int(py),:])
-                                if i < len(labels):
-                                    names.append("P%d_%s"%(i,labels[i]))
-                                else:
-                                    names.append("P%d"%i)
-                    lib = hylite.HyLibrary( 
-                            np.array(spectra)[:,None,:],
-                            lab=names, wav=image.get_wavelengths()  )
-                    
-                    # plot?
-                    if plot:
-                        fig,ax = lib.quick_plot()
-                        fig.canvas.manager.set_window_title(img_name+"_points")
-                        fig.show()
-                    O.set(img_name+"_points", lib)
-                    O.save()
-                    O.free()
-
-                # extract ROIs 
-                if (roi is not None) and (len(roi.data) > 0):
-                    labels = roi.text.values
-                    masks = roi.to_masks((image.ydim(), image.xdim()))
-                    spectra = [] # for average spectra library
-                    names = [] 
-                    for i,m in enumerate(masks):
-                        m = np.array( m ).T # convert mask to hylite layout
-
-                        print("Exporting ROI %s from image %s with %d bands."%(labels[i], img_name, image.band_count()))
-                        xmin = np.argmax(m.any(axis=1))
-                        xmax = m.shape[0] - np.argmax(m.any(axis=1)[::-1])
-                        ymin = np.argmax(m.any(axis=0))
-                        ymax = m.shape[1] - np.argmax(m.any(axis=0)[::-1])
-                        
-                        # construct output patch
-                        img = hylite.HyImage( image.data[xmin:xmax,ymin:ymax,:].copy() )
-                        img.set_wavelengths( image.get_wavelengths() )
-                        try:
-                            img.data[ ~m[xmin:xmax,ymin:ymax] ] = np.nan # float data
-                        except:
-                            img.data[ ~m[xmin:xmax,ymin:ymax] ] = 0 # int data
-                        if image.has_band_names():
-                            img.set_band_names(image.get_band_names())
-                        
-                        # save it
-                        S = O.addSub(str(labels[i]))
-                        S.set(img_name, img)
-                        S.save()
-                        S.free()
-
-                        # compute average for spectral library
-                        names.append(str(labels[i]))
-                        spectra.append(np.nanpercentile(img.data, (5,50,95), axis=(0,1)))
-                    
-                    lib = hylite.HyLibrary( np.array(spectra), names, wav=img.get_wavelengths())
-
-                    # plot?
-                    if plot:
-                        fig,ax = lib.quick_plot()
-                        fig.canvas.manager.set_window_title('%s_ROI'%img_name)
-                        fig.show()
-
-                    # save
-                    O.set('%s_ROI'%img_name, lib)
-                    O.save()
-                    O.free()
 

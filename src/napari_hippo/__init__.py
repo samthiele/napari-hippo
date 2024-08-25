@@ -1,26 +1,27 @@
 __version__ = "0.2.0"
 
 from ._base import *
-from ._reader import napari_get_ENVI_reader, napari_get_specim_reader
-from ._sample_data import make_sample_data
+from ._reader import napari_get_hylite_reader, napari_get_specim_reader
+from ._sample_data import make_sample_image
 from ._basicTools import BasicWidget
 from ._coregTools import CoregToolsWidget
 from ._hyliteTools import HyliteToolsWidget
-from ._fieldTools import FieldToolsWidget
+from ._hypercloudTools import HypercloudToolsWidget
 from ._caterpillarWidget import CaterpillarWidget
 from ._annotationTools import AnnotToolsWidget
 from ._writer import write_multiple, write_single_image
 
 __all__ = (
-    "napari_get_ENVI_reader",
+    "napari_get_hylite_reader",
     "napari_get_specim_reader",
     "write_single_image",
     "write_multiple",
-    "make_sample_data",
+    "make_sample_image",
+    "make_sample_cloud",
     "BasicWidget",
     "CoregToolsWidget",
     "HyliteToolsWidget",
-    "FieldToolsWidget",
+    "HypercloudToolsWidget",
     "CaterpillarWidget",
     "AnnotToolsWidget",
 )
@@ -29,6 +30,8 @@ __all__ = (
 import napari
 import os
 viewer = napari.current_viewer()  # get viewer
+import hylite
+hylite.band_select_threshold = 100. # be a bit tolerant here
 
 def update_slider(event):
     viewer.text_overlay.text = '' # no overlay

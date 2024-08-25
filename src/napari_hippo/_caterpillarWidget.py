@@ -113,8 +113,14 @@ class Caterpillar(QWidget):
         # plot points
         points_layer = self.viewer.layers[self.points_layer]
         for pxy, c in zip(points_layer.data, points_layer.face_color):
-            x = int(pxy[1])
-            y = int(pxy[0])
+            pxy = points_layer.data_to_world(pxy)
+            pxy = self.image_layer.world_to_data( pxy )
+            if pxy.shape[0] > 2:
+                x = int(pxy[2])
+                y = int(pxy[1])
+            else:
+                x = int(pxy[1])
+                y = int(pxy[0])
             if (x >= 0) and (x < image.xdim()) and (y >= 0) and ( y < image.ydim() ):
                 self.canvas.axes.plot(image.get_wavelengths(), image.data[x,y,:], color=c )
 
@@ -182,7 +188,9 @@ def export( base_image : 'napari.layers.Image',
     indices = []
     names = []
     for i, (pxy, c) in enumerate(zip(query_points.data, query_points.face_color)):
-        if len(pxy) > 2:
+        # convert to image coordinates to allow for affine transforms
+        pxy = base_image.world_to_data( query_points.data_to_world(pxy) )
+        if pxy.shape[0] > 2:
             x = int(pxy[2])
             y = int(pxy[1])
         else:

@@ -2,13 +2,13 @@
 
 import os
 import napari_hippo.testdata
-from napari_hippo._sample_data import make_sample_data
+from napari_hippo._sample_data import make_sample_image, make_sample_cloud
 from napari_hippo import n2h, h2n
 import numpy as np
 
 def test_sampleimage():
     assert os.path.exists(napari_hippo.testdata.image)
-    sample = make_sample_data()
+    sample = make_sample_image()
 
     # get data array and play with it a bit
     data = sample[0][0]
@@ -21,3 +21,11 @@ def test_sampleimage():
         data = np.zeros( (100,200,i) )
         assert h2n(data).shape == (200,100,i)
         assert h2n(n2h(data)).shape == data.shape
+
+def test_samplecloud():
+    assert os.path.exists(napari_hippo.testdata.cloud)
+    sample = make_sample_cloud()
+
+    # get data array and play with it a bit
+    data = sample[0][0]
+    assert data.shape[-1] == 3

@@ -18,8 +18,8 @@ def test_writer_functions(imageMode, capsys):
     assert os.path.exists(outpath)
 
     # load image again and check that it matches
-    from napari_hippo import napari_get_ENVI_reader
-    reader = napari_get_ENVI_reader(outpath)
+    from napari_hippo import napari_get_hylite_reader
+    reader = napari_get_hylite_reader(outpath)
     layer_data_list = reader(outpath)
     layer_data_tuple = layer_data_list[0]
     viewer.add_image(layer_data_tuple[0], **layer_data_tuple[1])

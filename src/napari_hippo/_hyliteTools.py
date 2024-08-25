@@ -14,8 +14,7 @@ import numpy as np
 from magicgui import magicgui
 import napari
 from ._guiBase import GUIBase
-from napari_hippo import getHyImage, h2n, n2h, getLayer, HSICube
-import re
+from napari_hippo import getLayer, HSICube
 import hylite
 from hylite.correct import get_hull_corrected
 from hylite.filter import MNF, PCA
@@ -49,6 +48,11 @@ class HyliteToolsWidget(GUIBase):
                                            auto_call=False)
         self._add([self.dimensionReduction_widget], 'Dimension Reduction')
 
+        self.combine_widget = magicgui(combine, 
+                                       method={"choices": ['median (p50)', 'mean', 'brightest', 'darkest', 'p90', 'p75', 'p25', 'p10']},
+                                       call_button='Compute' )
+        self._add([self.combine_widget], 'Combine')
+
         # add spacer at the bottom of panel
         self.qvl.addStretch()
 
@@ -70,7 +74,7 @@ def runOnImages( func, expand=False, all=False, add=False, suffix='', **kwargs )
             result = func(image, **kwargs)
             if result is not None:
                 if add:
-                    name = l.name + '(%s)'%suffix
+                    name = I.getName() + '(%s)'%suffix
                     out.append( HSICube.construct( result, name, viewer=viewer).layer )
                 else:
                     I.fromHyImage(func(image, **kwargs)) # update in situ
@@ -141,3 +145,64 @@ def dimensionReduction( method : str = 'PCA', ndim : int = 5, wmin : float = 200
         return R( image, bands= ndim, band_range=brange )[0]
     return runOnImages( op, method=method, ndim=ndim, wmin=wmin, wmax=wmax, suffix=method,add=True)
 
+def combine(method='median (p50)'):
+    """
+    Average multiple HSI images (with the same dimensions) into one file. 
+    Useful for e.g., averaging outcrop scans captured several times to reduce
+    noise.
+    """
+    
+    viewer = napari.current_viewer()  # get viewer
+    images = [] # gather images
+    nbands = None
+    for l in viewer.layers.selection:
+        I = getLayer(l)
+        if isinstance(I, HSICube):
+            images.append(I.toHyImage())
+            name = I.getName()
+            if nbands is None:
+                nbands = images[-1].band_count()
+            else: # check size match!
+                if images[-1].band_count() != nbands:
+                    napari.utils.notifications.show_warning(
+                        "Selected images have different number of bands")
+                    return
+    
+    if len(images) == 0:
+        napari.utils.notifications.show_warning(
+                        "No HSICube data selected")
+        return
+    
+    # compute dims
+    xdm = np.array([i.xdim() for i in images])
+    ydm = np.array([i.ydim() for i in images])
+    if (np.diff(xdm) != 0).any() or (np.diff(ydm) != 0).any():
+        napari.utils.notifications.show_info("Warning - selected images differ in size but up to (%d,%d) pixels."%(np.max(np.abs(np.diff(xdm))), np.max(np.abs(np.diff(ydm))))) 
+    if (np.diff([i.band_count() for i in images])!=0).any():
+        napari.utils.notifications.show_error("Error - selected images have different numbers of bands.")
+        return
+     
+    # average
+    if 'median' in method.lower():
+        arr = np.nanmedian([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], axis=0)
+    elif 'mean' in method.lower():
+        arr = np.nanmean([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], axis=0)
+    elif 'brightest' in method.lower():
+        arr = np.nanmax([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], axis=0)
+    elif 'darkest' in method.lower():
+        arr = np.nanmin([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], axis=0)
+    elif 'p90' in method.lower():
+        arr = np.nanpercentile([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], 90, axis=0)
+    elif 'p75' in method.lower():
+        arr = np.nanpercentile([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], 75, axis=0)
+    elif 'p25' in method.lower():
+        arr = np.nanpercentile([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], 25, axis=0)
+    elif 'p10' in method.lower():
+        arr = np.nanpercentile([i.data[:np.min(xdm), :np.min(ydm), :] for i in images], 10, axis=0)
+
+    # put in HyImage object
+    image = hylite.HyImage(arr)
+    image.set_wavelengths( images[0].get_wavelengths() )
+
+    # add to viewer
+    HSICube.construct( image, name+'(%s)'%method.lower().split(" ")[0], viewer)

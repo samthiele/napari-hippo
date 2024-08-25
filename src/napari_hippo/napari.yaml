@@ -2,9 +2,9 @@ name: napari-hippo
 display_name: Hippo
 contributions:
   commands:
-    - id: napari-hippo.get_ENVI_reader
-      python_name: napari_hippo._reader:napari_get_ENVI_reader
-      title: Open ENVI format hyperspectral data
+    - id: napari-hippo.get_hylite_reader
+      python_name: napari_hippo._reader:napari_get_hylite_reader
+      title: Open hyperspectral data (images, clouds etc.) using hylite.
     - id: napari-hippo.get_specim_reader
       python_name: napari_hippo._reader:napari_get_specim_reader
       title: Open raw Specim image directories (for FX, Fenix and OWL cameras).
@@ -14,9 +14,12 @@ contributions:
     - id: napari-hippo.write_single_image
       python_name: napari_hippo._writer:write_single_image
       title: Save image data with Hippo
-    - id: napari-hippo.make_sample_data
-      python_name: napari_hippo._sample_data:make_sample_data
-      title: Load sample data from Hippo
+    - id: napari-hippo.make_sample_image
+      python_name: napari_hippo._sample_data:make_sample_image
+      title: Load sample hyperspectral data cube from Hippo
+    - id: napari-hippo.make_sample_cloud
+      python_name: napari_hippo._sample_data:make_sample_cloud
+      title: Load sample hypercloud from Hippo
     - id: napari-hippo.make_BasicTools
       python_name: napari_hippo._basicTools:BasicWidget
       title: Basic IO and masking operations
@@ -29,16 +32,16 @@ contributions:
     - id: napari-hippo.make_hyliteTools
       python_name: napari_hippo._hyliteTools:HyliteToolsWidget
       title: Basic hyperspectral data analysis
-    - id: napari-hippo.make_fieldTools
-      python_name: napari_hippo._fieldTools:FieldToolsWidget
-      title: Quick tools for tripod scanning
+    - id: napari-hippo.make_hypercloudTools
+      python_name: napari_hippo._hypercloudTools:HypercloudToolsWidget
+      title: Manipulate and create hyperclouds
     - id: napari-hippo.make_caterpillar
       python_name: napari_hippo._caterpillarWidget:CaterpillarWidget
       title: Spectral viewer
   readers:
-    - command: napari-hippo.get_ENVI_reader
+    - command: napari-hippo.get_hylite_reader
       accepts_directories: false
-      filename_patterns: ['*.hdr', '*.dat', '*.png', '*.jpg', '*.jpeg', '*.bmp']
+      filename_patterns: ['*.hdr', '*.dat', '*.png', '*.jpg', '*.jpeg', '*.bmp', '*.ply']
     - command: napari-hippo.get_specim_reader
       accepts_directories: true
       filename_patterns: ['*']
@@ -50,9 +53,12 @@ contributions:
       layer_types: ['image','labels*']
       filename_extensions: ['.dat', '.hdr']
   sample_data:
-    - command: napari-hippo.make_sample_data
-      display_name: Hippo HSI
+    - command: napari-hippo.make_sample_image
+      display_name: Data Cube
       key: unique_id.1
+    - command: napari-hippo.make_sample_cloud
+      display_name: Hypercloud
+      key: unique_id.2
   widgets:
     - command: napari-hippo.make_BasicTools
       display_name: Basic
@@ -62,7 +68,7 @@ contributions:
       display_name: Hylite
     - command: napari-hippo.make_coregTools
       display_name: Coregister
-    - command: napari-hippo.make_fieldTools
-      display_name: Tripod
+    - command: napari-hippo.make_hypercloudTools
+      display_name: Hypercloud
     - command: napari-hippo.make_caterpillar
       display_name: Caterpillar

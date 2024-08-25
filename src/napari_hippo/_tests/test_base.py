@@ -191,16 +191,35 @@ def test_ROI(imageMode, stackMode, capsys):
             roi = ROI.construct(layer, mode=mode, viewer=viewer )
 
             # edit layer and check it updates
-            poly, text = roi.toList()
-            if 'batch' in roi.layer.name: # batch mode; add new 3D polygon
-                poly.append(np.array([(0,0,0),(0,0,10),(0,10,10),(0,10,0)],dtype=float))
-            else: # image mode; add new 2D polygon
-                poly.append(np.array([(0,0),(0,10),(10,10),(10,0)], dtype=float))
+            verts, text = roi.toList(world=layer)
             if mode == 'keypoints':
+                verts += [(0,0,0),(0,0,10.),(0,10,10),(0,10.,0)]
                 text += ['NewPoint' for p in range(4)]
             else:
+                if 'batch' in roi.layer.name: # batch mode; add new 3D polygon
+                    verts.append(np.array([(0,0,0),(0,0,10),(0,10,10),(0,10,0)],dtype=float))
+                else: # image mode; add new 2D polygon
+                    verts.append(np.array([(0,0),(0,10),(10,10),(10,0)], dtype=float))
                 text.append("NewROI")
-            roi.fromList( poly, text )
+            roi.fromList( verts, text, world=layer )
+
+            # check transpose works in fromList 
+            verts1, text1 = roi.toList(world=False, transpose=False)
+            verts2, text2 = roi.toList(world=False, transpose=True)
+            assert not (np.array(verts1[-1]) == np.array(verts2[-1])).all()
+            assert (np.array(text1) == np.array(text2)).all()
+
+            # check various permutations of toList and fromList
+            refdata = roi.layer.data.copy()
+            for w in [False, True, layer]:
+                for t in [False, True]:
+                    verts, text = roi.toList(world=w, transpose=t)
+                    assert len(verts)>0
+                    assert len(verts) == len(text)
+                    roi.fromList(verts, text, world=w, transpose=t)
+                    data2 = roi.layer.data
+                    for i,p in enumerate(refdata):
+                        assert (np.array(p == data2[i])).all() # check nothing has changed 
 
         # check correct layers have been constructed and are not empty
         assert ('[KP] image' in viewer.layers) or ('[KP] batch' in viewer.layers)
@@ -216,7 +235,7 @@ def test_ROI(imageMode, stackMode, capsys):
 
         #viewer.show(block=True)
         #break
-        
+
         # cleanup
         viewer.close()
         del layer
