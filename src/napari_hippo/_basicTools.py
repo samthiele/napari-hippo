@@ -28,7 +28,8 @@ class BasicWidget(GUIBase):
 def search( root : pathlib.Path = pathlib.Path(''),
             filter : str='*.png',
             rgb_only = True,
-            stack = True ):
+            stack = True,
+            stretch = False ):
     """
     Search for image files matching the query string and load them into Napari.
 
@@ -37,7 +38,7 @@ def search( root : pathlib.Path = pathlib.Path(''),
         filter: The query string. Should follow [glob syntax](https://man7.org/linux/man-pages/man7/glob.7.html).
         rgb_only: Only load the preview bands ('default bands' key in header file) of HSI images (rather than loading the whole data cube).
         stack: Stack loaded images into a single image file. Useful for flicking through large numbers of images.
-
+        stretch: If True, loaded images will be scaled to have the same width.
     Returns:
         images: a list containing the image layer(s) added.
     """
@@ -73,17 +74,17 @@ def search( root : pathlib.Path = pathlib.Path(''),
             out.append(image.layer)
 
             # sort out stretch
-            # if stretch and len(out) > 1:
-            #     # find scale factor that fits to target shape
-            #     target_shape = out[0].data.shape
-            #     s = min( float(target_shape[0]) / image.layer.data.shape[0], float(target_shape[1]) / image.layer.data.shape[1] )
+            if stretch and len(out) > 1:
+                 # find scale factor that fits to target shape
+                 target_shape = out[0].data.shape
+                 s = min( float(target_shape[0]) / image.layer.data.shape[0], float(target_shape[1]) / image.layer.data.shape[1] )
 
-            #     # define affine matrix
-            #     affine = np.array([[s, 0, 0],
-            #                        [0, s, 0], [0, 0, 1]])
+                 # define affine matrix
+                 affine = np.array([[s, 0, 0],
+                                    [0, s, 0], [0, 0, 1]])
                 
-            #     # set layer affine
-            #     out[-1].affine = affine
+                 # set layer affine
+                 out[-1].affine = affine
         
         viewer.reset_view()
         viewer.dims.set_point(0, 0)

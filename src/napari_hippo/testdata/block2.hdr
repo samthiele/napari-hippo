@@ -8,3 +8,4 @@ header offset = 0
 data type = 1
 interleave = bip
 byte order = 0
+target_shape = {26, 47}

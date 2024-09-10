@@ -110,7 +110,8 @@ def test_HippoData(imageMode, capsys):
     # cleanup
     os.remove( os.path.splitext(mask.path)[0] + '.dat')
     os.remove( os.path.splitext(mask.path)[0] + '.hdr')
-    #viewer.show(block=True)
+    
+    viewer.show(block=True)
     
 def test_Stack(stackMode, capsys):
     viewer, layer = stackMode() # get viewer and added image layer from fixture

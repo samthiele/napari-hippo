@@ -50,13 +50,38 @@ def test_extractData( cloudMode ):
     viewer.layers.selection = [layer]
     extractIDs()
 
-    viewer.show(block=True)
+    #viewer.show(block=True)
 
 def test_locate( cloudMode ):
     """
     Test PnP solution to camera position.
     """
     viewer, layer = cloudMode()
-    from napari_hippo._hypercloudTools import locate
-    nbg1 = np.sum( np.isnan(layer.data) )
-    locate()
+    from napari_hippo._hypercloudTools import locate, extractIDs
+    from napari_hippo import ROI
+    ids = extractIDs() # add an IDs layer to quickly get point ids
+    image = ids.toHyImage()
+
+    # add a keypoints layer
+    kps,labels = [(0,0)],["fubar"] # add some text labels to check this doesn't mess things up
+    np.random.seed(42)
+    for n in range(500):
+        _x = int(np.random.uniform(0, image.xdim()))
+        _y = int(np.random.uniform(0, image.ydim()))
+        pid = image.data[_x,_y,0]
+        if np.isfinite(pid) and (pid!=0):
+            kps.append((_x+np.random.rand()*3, 
+                        _y+np.random.rand()*3))
+            labels.append( '%d'%pid  )
+    
+    assert len(kps) > 4 # unlikely but not impossible
+
+    points = ROI.construct( ids.layer, mode = 'point', viewer=viewer )
+    points.fromList( kps, labels, world=True, transpose=True)
+    
+    result = locate( layer, points.layer, projection='panoramic', 
+           ifov=0.084, refine_method='None' )
+    assert result.metadata['residual'] < 2 # check we're close
+
+
+    viewer.show(block=True)

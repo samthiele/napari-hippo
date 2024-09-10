@@ -19,52 +19,83 @@ from scipy.spatial import distance_matrix
 
 from skimage.transform import AffineTransform, warp
 from skimage.measure import ransac
-from napari_hippo import getHyImage, h2n, n2h, getLayer, getMode, isImage, ROI
+from napari_hippo import getHyImage, h2n, n2h, getLayer, getMode, isImage, getByType, ROI, RGB, RGBA, BW, HSICube
 import pathlib
+from hylite import io
+from napari_hippo._annotationTools import saveAnnot
+import matplotlib.pyplot as plt
 class CoregToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 
         self.simpleT_widget = magicgui( simpleT, call_button="Transforms")
-        self._add([self.simpleT_widget], 'Simple Transforms')
+        self.fit_widget = magicgui( fitExtent, call_button="Match Extent")
+        self._add([self.simpleT_widget, self.fit_widget], 'Simple Transforms')
 
         self.addKP_widget  = magicgui(addKP, call_button='Add/Load Target(s)')
         self.sortKP_widget = magicgui(matchKP, call_button='Match New KPs')
+        self.fitAffine_widget = magicgui(fitAffine, call_button='Fit Affine')
+        self.save_widget = magicgui(save, call_button='Save')
         self._add([ self.addKP_widget,
-                    self.sortKP_widget], 'Coregister')
+                    self.sortKP_widget,
+                    self.fitAffine_widget,
+                    self.save_widget], 'Coregister')
 
+        
         self.resample_widget = magicgui(resample, call_button='Apply Affine')
         self._add([ self.resample_widget], "Resample" )
 
         # add spacer at the bottom of panel
         self.qvl.addStretch()
 
+def fitExtent( base : 'napari.layers.Image' ):
+    """
+    Match the width of the selected images to the width of the reference one.
+    """
+    viewer = napari.current_viewer()  # get viewer
+    if not isImage(base):
+        napari.utils.notifications.show_warning('Please select an image layer as reference')
+        return
+    reference = getLayer(base,viewer=viewer).toHyImage()
+
+    layers = viewer.layers.selection
+    if len(layers) == 0:
+        layers = viewer.layers
+
+    for L in getByType(layers, [HSICube, RGBA, RGB, BW]): 
+        if L.layer == base:
+            continue # skip
+        
+        # compute sf
+        sf = reference.xdim() / L.toHyImage().xdim()
+
+        # set affine
+        L.layer.affine = np.array([[sf, 0, 0],
+                                    [0, sf, 0], [0, 0, 1]])
+
 def simpleT():
     """
     Build a side-panel for applying simple transformations.
     """
-    if checkMode():
-        viewer = napari.current_viewer()
-        viewer.window.add_function_widget(scale, 
-                                        magic_kwargs=dict(call_button='Scale',
+    viewer = napari.current_viewer()
+    viewer.window.add_function_widget(transform, 
+                                        magic_kwargs=dict(call_button='Transform',
                                         x_scale=dict(min=-np.inf, max=np.inf, step=0.005),
-                                        y_scale=dict(min=-np.inf, max=np.inf, step=0.005) 
-                                        ),
-                                        name="Scale",
-                                        area='left')
-        viewer.window.add_function_widget(translate, 
-                                        magic_kwargs=dict(call_button='Translate',
+                                        y_scale=dict(min=-np.inf, max=np.inf, step=0.005),
                                         x=dict(min=-np.inf, max=np.inf, step=0.01),
-                                        y=dict(min=-np.inf, max=np.inf, step=0.01) 
-                                        ),
-                                        name="Translate",
-                                        area='left')
-        viewer.window.add_function_widget(rot, 
-                                        magic_kwargs=dict(call_button='Rotate',
+                                        y=dict(min=-np.inf, max=np.inf, step=0.01),
                                         angle=dict(min=-np.inf, max=np.inf, step=0.005),
-                                        ),
-                                        name="Rotate",
-                                        area='left')
+                                    ),
+                                    name="Transform",
+                                    area='left')
+
+def transform( x_scale : float = 1, y_scale : float = 1, x : float = 0.0, y : float = 0.0, relative=True, angle : float = 0.0 ):
+    """
+    Apply a combined transformation to the specified layer.
+    """
+    scale(x_scale=x_scale, y_scale=y_scale)
+    rot(angle=angle)
+    translate(x=x,y=y,relative=relative)
 
 def scale( x_scale : float = -1, y_scale : float = -1 ):
     """
@@ -197,17 +228,36 @@ def addKP():
             layers = viewer.layers
         
         out = []
-        for l in viewer.layers:
+        for i,l in enumerate(viewer.layers):
             if isImage(l):
                 # N.B. this will load keypoint from header files
                 # if they are defined! :-) 
                 out.append( ROI.construct(l, mode='point', viewer=viewer).layer )
                 out[-1].mode = 'ADD'
 
+                # choose random color and set
+                c = np.array(plt.cm.get_cmap('tab20', len(viewer.layers))(i))
+                out[-1].face_color = [c for i in range(len(out[-1].face_color))]
+                out[-1].opacity = 0.8
+                out[-1].size = [4 for i in range(len(out[-1].size))]
+                out[-1].current_face_color = [c]*100
+                out[-1].current_size = [4]
                 # link to allow easier toggling
                 link_layers( [out[-1], l], ('visible',) )
 
-                # TODO - get image and check for affine matrix
+                # check for affine matrix
+                img = getLayer(l).toHyImage()
+                if 'affine' in img.header:
+                    # load affine matrix from header
+                    A = np.eye(3)
+                    A[0,:] = img.header.get_list('affine')[:3]
+                    A[1,:] = img.header.get_list('affine')[3:]
+
+                    # set it for both image and keypoints
+                    l.affine = A
+                    out[-1].affine = A
+
+        # viewer.layers.move_multiple([int(i) for i in np.argsort( [l.name for l in viewer.layers] )[:-1]])
 
         return out 
     return []
@@ -219,13 +269,12 @@ def matchKP():
     """
     if checkMode():
         viewer = napari.current_viewer()
-        layers = viewer.layers.selection
-        if len(layers) == 0:
-            layers = viewer.layers
-        
+
         # get keypoint layers
-        R = [getLayer(l) for l in layers if l.metadata.get('type','') == 'ROI']
-        if len(R) < 2:
+        R = [getLayer(l) for l in viewer.layers.selection if l.metadata.get('type','') == 'ROI']
+        if len(R) < 2: # not enough in selection; check whole environment
+            R = [getLayer(l) for l in viewer.layers if l.metadata.get('type','') == 'ROI']
+        if len(R) < 2: # still not enough layers... show error and leave
             napari.utils.notifications.show_error(
             "Select multiple keypoint layers to match." )
             return
@@ -233,7 +282,7 @@ def matchKP():
         # build dictionary of un-named points
         points = {}
         for k in R:
-            verts, text = k.toList()
+            verts, text = k.toList(world=True)
             verts = np.array([p for p,t in zip(verts,text) if t == '']) # unlabelled points
             ixx = [i for i,t in enumerate(text) if t == ''] # corresponding indices
             if len(verts) == 0:
@@ -247,12 +296,13 @@ def matchKP():
             points[k] = (angle, ixx, verts ) # store angles
 
         # get reference names and angles
-        # (from the smallest point cloud)
+        # (from the smallest point set)
         ref_angle = None
         mincount = np.inf
-        ref = k
+        ref = None
         for k,(angle,idx,verts) in points.items():
             if (verts.shape[0] < mincount) and (verts.shape[0] > 0):
+                ref = k
                 ref_angle = angle
                 mincount = verts.shape[0]
                 names = np.array(["kp%d%d"%(p[0],p[1]) for p in verts])
@@ -279,138 +329,99 @@ def matchKP():
             k.layer.text.values = text # set text array
             k.layer.refresh()
 
-def autoKP():
+def fitAffine( base : 'napari.layers.Image' ):
     """
-    Use SIFT or ORB to automatically construct keypoints
-    for the selected layers.
-    """
-    if checkMode():
-        viewer = napari.current_viewer()
-        layers = viewer.layers.selection
-        if len(layers) == 0:
-            layers = viewer.layers
-
-def saveKP():
-    """
-    Save keypoints associated with the selected layers to 
-    disk.
+    Fit affine based on matches between all keypoint layers.
     """
     if checkMode():
         viewer = napari.current_viewer()
-        layers = viewer.layers.selection
-        if len(layers) == 0:
-            layers = viewer.layers
+        layers = viewer.layers
+        
+        # get keypoint layers
+        R = [getLayer(l) for l in layers if l.metadata.get('type','') == 'ROI']
+        if len(R) < 2:
+            napari.utils.notifications.show_error(
+            "Select multiple keypoint layers to match." )
+            return
+        
+        # get image layers associated with each keypoint layer
+        I = [getLayer(l.base) for l in R]
 
+        # get keypoints associated with base image
+        m = [i for i,img in enumerate(I) if img.layer.name == base.name]
+        if len(m) == 0:
+            napari.utils.notifications.show_error(
+            "No keypoints found for selected base layer (%s)."%base.name )
+            return
 
-def addCoregOld():
+        # get base image and associated keypoints and reset affine
+        base_image = I[m[0]]
+        base_hyimage = base_image.toHyImage()
+        base_points = R[m[0]]
+        base_image.layer.affine = np.eye(3)
+        base_image.affine = np.eye(3)
+        base_points.layer.affine = np.eye(3)
+
+        bKP, bTxt = base_points.toList(world=base_image.layer)
+        keypoints = dict(zip(bTxt, bKP))
+
+        # compute affines for other layers
+        for img,kp in zip(I,R):
+            # store target shape
+            img.target_shape = [base_hyimage.xdim(), base_hyimage.ydim()]
+            if img == base_image: # affine here is known
+                continue
+
+            # find matching kps
+            KP, Txt = kp.toList(world=img.layer)
+            kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
+            kp2 = np.array([keypoints[t] for k,t in zip(KP,Txt) if t in keypoints])
+            if len(kp1) <= 3:
+                napari.utils.notifications.show_error(
+                "Less than three matching keypoints found for %s."%img.layer.name )
+                continue
+            
+            # fit affine
+            affine, _ = _est_affine(kp1,kp2)
+            img.layer.affine = affine # set layer affine
+            img.affine = np.hstack([affine[0,:], affine[1,:]]) # store flattened affine
+            
+            # repeat, but for keypoints
+            KP, Txt = kp.toList(world=False)
+            kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
+            affine, inliers = _est_affine(kp1,kp2)
+            kp.layer.affine = affine
+
+        # estimate residual for testing purposes
+        KP, Txt = kp.toList(world=True) # N.B. this checks in world coords!
+        kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
+        resid = np.mean( np.abs( kp1[inliers] - kp2[inliers] ) )
+        return resid # return residual for testing purposes
+    
+def save():
     """
-    Create coregistration layers who's vertices can be adjusted to manually-identified keypoints.
+    Save keypoints and associated affine transforms to disk.
     """
-    # get viewer
-    viewer = napari.current_viewer()
+    viewer = napari.current_viewer()  # get viewer
+    if checkMode():
+        # save keypoints (easy, as they are just annotations!)
+        saveAnnot(format = 'header')
 
-    #layers = list(viewer.layers.selection)
-    #if len(layers) == 0:
-    layers = list(viewer.layers)
+        # save affine matrices also in header file
+        I = getByType( viewer.layers, [HSICube, RGBA, RGB, BW])
+        out = {}
+        for img in I:
+            if 'affine' in img.layer.metadata:
+                pth = os.path.splitext(img.path)[0] + '.hdr'
+                header = io.loadHeader(pth)
+                header['affine'] = img.layer.metadata['affine']
+                header['target_shape'] = img.layer.metadata['target_shape']
+                io.saveHeader(pth, header)
+                out[pth] = header # for testing
 
-    points = []
-    for l in layers:
-        if isinstance(l, napari.layers.Image ):
-            if (l.name + " [kp]") not in layers:
-                points.append(viewer.add_points(name=l.name + " [kp]",
-                                                metadata={'image': l.name,
-                                                          'affine' : l.affine},
-                                                size=6))
-                points[-1].mode = 'ADD'
-
-                # load data?
-                if 'path' in l.metadata:
-                    pth = os.path.join( os.path.dirname( l.metadata['path'] ), 'crunchycoreg.npz' )
-                    if os.path.exists(pth):
-                        f = np.load(pth)
-                        print("Loading coreg points from %s" % pth)
-                        if 'keypoints' in f.keys():
-                            if ('%s_affine' % l.name) in f:
-                                kp = f['keypoints'].reshape((-1,2))[:,[1,0]]
-                                aff = np.vstack( [f['%s_affine' % l.name ], [0., 0., 1.]] )
-
-                                # NASTY HACK - apply crunchy RGB scale if needed
-                                if ('rgb_scale' in f) and ('RGB' in l.name):
-                                    aff /= f['rgb_scale']
-
-                                l.affine = aff # set affine of layer
-                                points[-1].metadata['affine'] = l.affine
-                                points[-1].data = kp.astype(float)
-
-    viewer.layers.move_multiple([int(i) for i in np.argsort( [l.name for l in viewer.layers] )[:-1]])
-    return points
-
-def computeAffine( base_image : 'napari.layers.Image' ):
-    """
-    Use vertices of the coregistration targets to compute affine transforms that align the images.
-    """
-    viewer = napari.current_viewer() # get viewer
-
-    # check some points are defined
-    if not '%s [kp]' % base_image.name in viewer.layers:
-        napari.utils.notifications.show_error("Please define coregistration targets for base image (%s)" % base_image.name)
-        return
-
-    # get target coordinates
-    keypoints = {}
-    for l in viewer.layers:
-        if '[kp]' in l.name:
-            if len(l.data) > 3:
-                if ('image' in l.metadata) and ('affine' in l.metadata):
-                    # get keypoints
-                    xyz = np.hstack([l.data, np.ones((len(l.data), 1))])
-
-                    # order keypoints
-                    xyz = _order_keypoints(xyz)
-
-                    # transform to image coords by applying inverse affine and store
-                    keypoints[l.metadata['image']] = np.dot(xyz, l.metadata['affine'].inverse.affine_matrix.T)[:, :2]
-
-
-    # reset affine of base image (as this is what we now georeference too)
-    base_image.affine = np.eye(3)
-    base_image.metadata['base'] = base_image.name
-    base_points = viewer.layers['%s [kp]' % base_image.name]
-    base_points.data = keypoints[base_image.name]
-    base_points.metadata['affine'] = base_image.affine
-    base_points.refresh()
-
-    # update affine transform and points for other layers
-    dst = keypoints[base_image.name]
-    resid = []
-    for k,src in keypoints.items():
-        if k == base_image.name:
-            continue
-        #src, dst = _match_keypoints(src, dst)
-        a, i = _est_affine(src, dst)
-
-        # update image affine
-        viewer.layers[k].affine = a
-        viewer.layers[k].metadata['base'] = base_image.name
-
-        # update keypoints positions
-        xyz = np.hstack([src, np.ones((len(src), 1))])
-        xyz = np.dot(xyz, a.T)
-        resid.append( xyz[:,:2] - dst)
-        viewer.layers['%s [kp]' % k].data = xyz[:,:2]
-        viewer.layers['%s [kp]' % k].metadata['affine'] = viewer.layers[k].affine
-        viewer.layers['%s [kp]' % k].refresh()
-    return np.array(resid)
-
-def _order_keypoints( kp ):
-    """
-    Order keypoints based on their relative angle to the local mean. For non-rotational affine transforms this should
-    give reasonalbe matching regardless of the input order!
-    """
-    kp1c = kp - np.mean(kp, axis=0)
-    ix1 = np.argsort(np.arctan2(kp1c[:, 0], kp1c[:, 1]))
-    return kp[ ix1, : ]
-
+        napari.utils.notifications.show_info(
+            "Saved affine and keypoints to header files." )
+        return out
 
 def _est_affine(kp1, kp2, residual_threshold=3, max_trials=1000):
     # robustly estimate affine transform model with RANSAC

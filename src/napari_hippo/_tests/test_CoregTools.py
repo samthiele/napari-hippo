@@ -7,6 +7,7 @@ import numpy as np
 import napari_hippo
 from pathlib import Path
 from napari_hippo import getLayer, HSICube
+from hylite import io
 
 @pytest.fixture
 def coregMode(make_napari_viewer):
@@ -46,6 +47,19 @@ def coregMode(make_napari_viewer):
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
+
+def test_fitExtent(coregMode):
+    # make viewer and add an image layer using our fixture
+    viewer, layers = coregMode()
+
+    from napari_hippo._coregTools import  fitExtent   # match extent
+    viewer.layers.selection.clear()
+    fitExtent( layers[0] )
+
+    assert np.array(layers[1].affine)[0,0] < 1 # affine should be smaller than 1
+
+    #viewer.show(block=True)
+
 def test_manualCoreg(coregMode, capsys):
     # make viewer and add an image layer using our fixture
     viewer, layers = coregMode()
@@ -62,7 +76,7 @@ def test_manualCoreg(coregMode, capsys):
     p0 = layers[0].data_to_world([10,10])
     p1 = layers[1].world_to_data([10,10])
     assert np.sqrt(np.sum((p1-p0)**2)) < 30 # check approximate alignment now
-
+    
     # add manual keypoints
     from napari_hippo._coregTools import addKP, matchKP
     kpl = addKP()
@@ -86,63 +100,23 @@ def test_manualCoreg(coregMode, capsys):
             assert t != '' # ensure there are no missing names now
     
     # now test actual coregistration
+    from napari_hippo._coregTools import  fitAffine  
+    resid = fitAffine( base = layers[0] )
+    assert resid < 1e-6 # should be very very small!
 
+    # save affine
+    from napari_hippo._coregTools import  save
+    headers = save()
 
-    # viewer.show(block=True)
+    # cleanup!
+    for p,h in headers.items():
+        assert 'affine' in h
+        todel = []
+        for k,v in h.items():
+            if ('affine' in k) or ('point kp' in k):
+                todel.append(k)
+        for k in todel:
+            del h[k]
+        io.saveHeader( p, h )
 
-
-
-
-def test_coreg(make_napari_viewer, capsys):
-    # test coregistration (at least run it)
-    # make viewer and add an image layer using our fixture
-    viewer = make_napari_viewer()
-
-    # create our widget, passing in the viewer, and add it to napari as a dock
-    w = CrunchyToolsWidget(viewer)
-    viewer.window.add_dock_widget(w)
-
-    from napari_hippo._basicTools import search
-    from napari_hippo._coregTools import addCoreg, computeAffine, exportAffine, resample
-    search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png', stretch=True, stack=False) # this should load 2 more images
-
-    viewer.layers.selection.clear()
-    addCoreg()
-    xy = np.random.rand(11,2) * 30
-    for i, l in enumerate(viewer.layers):
-        if '[kp]' in l.name:
-            l.data = xy - i # add a shift of a few pixels
-
-    r = computeAffine(base_image=viewer.layers['[slice] block1'])
-    assert np.max( np.abs(r) ) < 1e6 # should all be close to 0
-
-    # save
-    pths = exportAffine()
-    for p in pths:
-        assert os.path.exists(p)
-
-    # remove afffine layers
-    todel = [l.name for l in viewer.layers if '[kp]' in l.name]
-    for l in todel:
-        del viewer.layers[l]
-
-    # add them again (and check loading!)
-    addCoreg()
-    for l in viewer.layers:
-        if '[kp]' in l.name:
-            assert len(l.data) > 0
-
-    # clean
-    for p in pths:
-        os.remove(p)
-
-    # warp
-    viewer.layers.selection.clear()
-    resample()
-
-    #assert (viewer.layers['[slice] block1 [warped]']._data_view.shape[0] == viewer.layers['[slice] block2 [warped]']._data_view.shape[0])
-    #assert (viewer.layers['[slice] block1 [warped]']._data_view.shape[1] == viewer.layers['[slice] block2 [warped]']._data_view.shape[1])
-
-    # viewer.show(block=True)
-
-
+    viewer.show(block=True)

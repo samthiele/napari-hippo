@@ -32,11 +32,20 @@ import os
 viewer = napari.current_viewer()  # get viewer
 import hylite
 hylite.band_select_threshold = 100. # be a bit tolerant here
+from napari_hippo._base import getMode, getLayer, Stack
 
 def update_slider(event):
     viewer.text_overlay.text = '' # no overlay
+    step = viewer.dims.current_step[0]
     if getMode(napari.current_viewer()) == 'Batch':
-        viewer.text_overlay.text = '[Batch Mode]' # flag that napari is in batch mode
+        layers = getByType(viewer.layers, Stack)
+        if len(layers) > 0:
+            if hasattr(layers[0], 'path'):
+                if step < len(layers[0].path):
+                    p = layers[0].path[step]
+                    dname = os.path.basename( os.path.dirname(p))
+                    fname = os.path.basename( p )
+                    viewer.text_overlay.text = "%s/%s"%(dname,fname)
 
     step = viewer.dims.current_step[0]
     # check layers in selection, then entire tree

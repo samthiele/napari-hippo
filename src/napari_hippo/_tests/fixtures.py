@@ -35,6 +35,6 @@ def stackMode(make_napari_viewer):
         # add test data cube
         from napari_hippo._basicTools import search
         search(pathlib.Path(os.path.dirname(os.path.dirname(__file__))), 'testdata/*.png',
-                            rgb_only=True, stack=True )
+                            rgb_only=True, stack=True, stretch=True )
         return viewer, viewer.layers[0]
     return f

@@ -13,9 +13,13 @@ import numpy as np
 from magicgui import magicgui
 import napari
 from ._guiBase import GUIBase
-from napari_hippo import getByType, getLayer, View, HSICube, BW
+from napari_hippo import getByType, getLayer, View, HSICube, BW, ROI, Scene
 import hylite
+from hylite import io
 from pathlib import Path
+
+from hylite.project.align import align_to_cloud_manual
+from hylite.project import Camera
 class HypercloudToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
@@ -78,18 +82,18 @@ def _extract(ids=False):
         if ids:
             image = I.toIDImage()
             name += '(ID)'
-            BW.construct( image, name, viewer )
+            return BW.construct( image, name, viewer )
         else:
             image = I.toDataImage()
-            HSICube.construct( image, name, viewer )
+            return HSICube.construct( image, name, viewer )
 
 def extractData():
-    _extract(False)
+    return _extract(False)
 
 def extractIDs():
-    _extract(True)
+    return _extract(True)
 
-def locate( cloud : 'napari.layers.Image', 
+def locate( view : 'napari.layers.Image', 
             keypoints : 'napari.layers.Points',
             projection : str = 'panoramic',
             ifov : float = 0.039,
@@ -100,13 +104,59 @@ def locate( cloud : 'napari.layers.Image',
     using openCV's implementation of the PnP problem.
 
     Args:
-        cloud: A pathlib.Path to the point cloud to which pointIDs correspond.
-        output: A pathlib.Path to a text file where the resulting camera pose information should be written.
-        auto_match: True if SIFT matching should be performed to refine the initial PnP solution (by including more
+        view: A View that defines the cloud to which the keypoints belong.
+        keypoints: A KP layer containing the point keypoints with integer (point ID) names.
+        refine_method: True if SIFT matching should be performed to refine the initial PnP solution (by including more
                     keypoints).
     """
-    pass
+    viewer = napari.current_viewer()  # get viewer   
 
+    # get keypoints layer 
+    kps = getLayer( keypoints, viewer = viewer)
+    if not isinstance(kps, ROI):
+        napari.utils.notifications.show_warning("Keypoints must be a [KP] layer")
+        return
+    points, names = kps.toList( world=True, transpose=True )
+
+    # load cloud layer
+    view = getLayer( view, viewer = viewer)
+    if not isinstance(view, View):
+        napari.utils.notifications.show_warning("Cloud must be a [Scene] layer.")
+        return
+    if not os.path.exists(view.path):
+        napari.utils.notifications.show_warning("Cloud not found: %s"%view.path)
+        return
+    cloud = io.load(view.path)
+
+    # find keypoints with integer names
+    kps_3d = []
+    kps_2d = []
+    for p,n in zip(points, names):
+        try:
+            pid = int(n) # try converting to an integer
+        except:
+            continue # try next one
+        if (pid > 0) and (pid < cloud.point_count()):
+            kps_3d.append( pid )
+            if len(p) == 3:
+                kps_2d.append( (p[1], p[2] ) )
+            else:
+                kps_2d.append( (p[0], p[1] ) )
+    
+    # create Camera object
+    xdim = 500  # how to get this info?
+    ydim = 401
+    cam = Camera( np.zeros(3), 
+                 np.zeros(3), 
+                 proj=projection, fov=ydim*ifov, step=ifov, dims=(xdim,ydim) )
+    
+    # solve pnp
+    cam, residual = align_to_cloud_manual( cloud, cam, kps_3d, kps_2d )
+
+    # add output
+    result = View.construct( cloud, view.getName()+"(est)", cam,viewer=viewer, 
+                                residual=residual, path=view.path )
+    return result.layer
 
 # def qaqc( saturation : bool = True, noise : bool = True ):
 #     viewer = napari.current_viewer()  # get viewer

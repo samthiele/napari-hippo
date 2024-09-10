@@ -94,9 +94,9 @@ def read_specim( path, return_data=False ):
     then this returns a HyImage result rather than an arguments tuple as expected
     by napari.
     """
-    if getMode(napari.current_viewer()) == 'Batch':
-        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
-        return []
+    #if getMode(napari.current_viewer()) == 'Batch':
+    #    napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+    #    return []
     
     if isinstance(path, str):
         path = [path]
@@ -171,9 +171,9 @@ def read_RGB( path, force_rgb=True, return_data=False ):
 
     Returns: A tuple containing (image data, napari kwargs, image name ).
     """
-    if getMode(napari.current_viewer()) == 'Batch':
-        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
-        return []
+    #if getMode(napari.current_viewer()) == 'Batch':
+    #    napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+    #    return []
 
     # wrap in list
     if isinstance(path, str):
@@ -186,8 +186,12 @@ def read_RGB( path, force_rgb=True, return_data=False ):
         name = os.path.splitext(os.path.basename(p))[0]
 
         # load image
-        image = io.load(p)
-        image.decompress()
+        try:
+            image = io.loadWithGDAL(p) # try with GDAL if it is installed
+        except:
+            image = io.load(p) # if not, use SPy
+
+        #image.decompress()
 
         # store add_image kwargs
         if return_data:
@@ -208,9 +212,9 @@ def read_hylite( path, force_rgb=False, return_data=False ):
     Returns: A tuple containing (image data, napari kwargs, image name ).
 
     """
-    if getMode(napari.current_viewer()) == 'Batch':
-        napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
-        return []
+    #if getMode(napari.current_viewer()) == 'Batch':
+    #    napari.utils.notifications.show_warning("Cannot load more images when in batch mode. Please delete existing stack before opening a new file.")
+    #    return []
 
     # wrap in list
     if isinstance(path, str):
