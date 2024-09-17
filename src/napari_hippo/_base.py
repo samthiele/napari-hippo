@@ -446,6 +446,7 @@ class Mask( HippoData ):
             mask = [mask]
         
         for p,m in zip(path, mask):
+            m.data = m.data.astype(np.uint16)
             if force_dirmode: # override path to save in directory mode
                 p = str(Path(os.path.dirname(path)) / "mask.hdr")
             hylite.io.save(p, m)

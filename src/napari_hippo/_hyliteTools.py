@@ -142,7 +142,10 @@ def dimensionReduction( method : str = 'PCA', ndim : int = 5, wmin : float = 200
                 "Warning: Unknown dimension reduction method %s."%method)
             return None
         brange = ( image.get_band_index(wmin), image.get_band_index(wmax) )
-        return R( image, bands= ndim, band_range=brange )[0]
+        out = R( image, bands= ndim, band_range=brange )[0]
+        out.set_wavelengths( np.arange(0,out.band_count() ) ) # overwrite wavelengths as we don't need the cumulative variance and it makes it hard to build false-color images
+        return out
+    
     return runOnImages( op, method=method, ndim=ndim, wmin=wmin, wmax=wmax, suffix=method,add=True)
 
 def combine(method='median (p50)'):

@@ -288,11 +288,12 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
             spectra = np.vstack( v[n] )
             lib = lib + hylite.HyLibrary( spectra[None,:,:], lab=[n], wav=wav[k])
         O.set( k, lib)
-
+        O.save()
+        O.free()
         if plot:
             fig,ax = lib.quick_plot()
             ax.set_title(k)
             fig.show()
     O.save() # write everything to disk
-
+    O.free()
 
