@@ -64,7 +64,7 @@ def test_dimReduce( hyliteMode, capsys ):
     dimensionReduction()
     assert '[HSICube] image(PCA)' in viewer.layers
     assert viewer.layers['[HSICube] image(PCA)'].metadata['bands'] == 5
-    #viewer.show(block=True)
+    viewer.show(block=True)
 
 def test_combine( hyliteMode, capsys):
     viewer, layer = hyliteMode() # get viewer and added image layer from fixture

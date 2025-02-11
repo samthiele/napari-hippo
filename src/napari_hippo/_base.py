@@ -459,14 +459,17 @@ class Mask( HippoData ):
     
     def toHyImage(self):
         if self.ndim() == 2: # image mask
-            image = hylite.HyImage( n2h( self.layer.data != 0 ) )
+            #image = hylite.HyImage( n2h( self.layer.data != 0 ) )
+            image = hylite.HyImage( n2h( self.layer.data ) )
         else: # Stack mask
             image = []
             base = getLayer( self.base )
             for i in range(self.layer.data.shape[0]):
                 # ensure mask shape matches underlying image shape in stack
+                #mask = self.layer.data[i, :base.stack_rows[i], 
+                #                       :base.stack_cols[i]] != 0
                 mask = self.layer.data[i, :base.stack_rows[i], 
-                                       :base.stack_cols[i]] != 0
+                                       :base.stack_cols[i]]
                 image.append( hylite.HyImage( n2h( mask )  ) )
         return image
     

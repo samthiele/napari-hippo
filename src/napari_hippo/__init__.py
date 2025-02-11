@@ -46,20 +46,16 @@ def update_slider(event):
                     dname = os.path.basename( os.path.dirname(p))
                     fname = os.path.basename( p )
                     viewer.text_overlay.text = "%s/%s"%(dname,fname)
-
-    step = viewer.dims.current_step[0]
-    # check layers in selection, then entire tree
-    for layers in [list(viewer.layers.selection), list(viewer.layers)]:
-        for l in layers:
-            if 'STACK' in l.metadata.get('type', '') and ('path' in l.metadata):
-                if step < len(l.metadata['path']):
-                    path = l.metadata['path'][step]
-                    viewer.text_overlay.text = os.path.basename( os.path.dirname(path) ) + '/' + os.path.basename(path)
                     return
-            elif ('HSIf' in l.metadata.get('type', '')) and ('wav' in l.metadata):
-                if step < len(l.metadata['wav']):
-                    viewer.text_overlay.text = "wavelength: %.1f" % l.metadata['wav'][step]
-                    return
+    else:
+        # check layers in selection, then entire tree
+        for layers in [list(viewer.layers.selection), list(viewer.layers)]:
+            for l in layers:
+                if 'wavelength' in l.metadata:
+                    if len(l.metadata['wavelength']) > step:
+                        w = l.metadata['wavelength'][step]
+                        viewer.text_overlay.text = "%d nm"%(w)
+                        return
     
 if viewer is not None:
     viewer.text_overlay.visible = True
