@@ -23,6 +23,9 @@ contributions:
     - id: napari-hippo.make_BasicTools
       python_name: napari_hippo._basicTools:BasicWidget
       title: Basic IO and masking operations
+    - id: napari-hippo.make_LibraryTools
+      python_name: napari_hippo._libraryTools:LibraryWidget
+      title: Tools for masking and exporting spectral libraries from hyperspectral images
     - id: napari-hippo.make_AnnotTools
       python_name: napari_hippo._annotationTools:AnnotToolsWidget
       title: Define and extract ROIs and keypoints
@@ -70,5 +73,7 @@ contributions:
       display_name: Coregister
     - command: napari-hippo.make_hypercloudTools
       display_name: Hypercloud
+    - command: napari-hippo.make_LibraryTools
+      display_name: Library
     - command: napari-hippo.make_caterpillar
       display_name: Caterpillar
