@@ -34,12 +34,24 @@ class LibraryWidget(GUIBase):
         self._add([self.test_widget], 'Construct Library')
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
-              output_folder: str = "annotated_lib",
+              output_folder: str = "Library",
               fingerprints: pathlib.Path = None):
     """
     Main function to construct a spectral library from a directory of samples.
     Args:
         input (pathlib.Path): Input directory containing sample folders.
+        The directory structure should be:
+        <input>
+            ├── sample1
+            │   ├── mask.hdr
+            │   ├── sensor1.hdr
+            │   ├── sensor2.hdr
+            │   └── RGB.png (Optional)
+            ├── sample2
+            │   ├── mask.hdr
+            │   ├── sensor1.hdr
+            │   ├── sensor2.hdr
+            │   └── RGB.png (Optional)
         output_folder (str): Name of the output folder for results.
         fingerprints (pathlib.Path): Optional path to fingerprint file.
     """
@@ -51,6 +63,7 @@ def construct(input: pathlib.Path = pathlib.Path(''),
 
     if fingerprints is None:
         print('No fingerprints provided')
+        print('This function is not yet implemented')
         fingerprints = pathlib.Path('')
 
     # Iterate through all subdirectories and build the spectral library
