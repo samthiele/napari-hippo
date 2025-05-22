@@ -11,11 +11,4 @@ src/napari_hippo/testdata/block1.dat
 src/napari_hippo/testdata/block1.hdr
 src/napari_hippo/testdata/block2.dat
 src/napari_hippo/testdata/block2.hdr
-src/napari_hippo/testdata/Library/image.hdr
-src/napari_hippo/testdata/Library/image.html
-src/napari_hippo/testdata/Library/image.json
-src/napari_hippo/testdata/Library/image.lib
-src/napari_hippo/testdata/mask/sample1/image.dat
-src/napari_hippo/testdata/mask/sample1/image.hdr
-src/napari_hippo/testdata/mask/sample1/mask.dat
-src/napari_hippo/testdata/mask/sample1/mask.hdr
+
