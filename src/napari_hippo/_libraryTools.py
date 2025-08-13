@@ -25,22 +25,35 @@ class LibraryWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
         # Setup the magicgui widget for library construction
-        self.test_widget = magicgui(
+        self.lib_widget = magicgui(
             construct,
             input={'mode': 'd'},
-            output_folder={"widget_type": "LineEdit"},
+            output={
+                "widget_type": "LineEdit",
+            },
             fingerprints={"filter": "*.json"},
             call_button='Build',
             auto_call=False
         )
-        self._add([self.test_widget], 'Construct Library')
 
-        # Add a tutorial text block below the widget
+        self._add([self.lib_widget], 'Construct Library')
+
+        # When input is chosen, set output to base directory of input + '/Library'
+        def set_output_based_on_input(event):
+            input_path = self.lib_widget.input.value
+            if input_path and input_path != pathlib.Path(''):
+                base_dir = input_path.parent
+                default_output = base_dir / "Library"
+                self.lib_widget.output.value = default_output
+
+        self.lib_widget.input.changed.connect(set_output_based_on_input)
+
+        # Tutorial text
         tutorial_text = (
             "<b>Step 1:</b> Click 'Choose directory' for 'input'.<br>"
             "The directory structure should be:"
             "<pre>"
-            # "&lt;input&gt;<br>"
+            "&lt;input&gt;<br>"
             "    ├── sample1<br>"
             "    │   ├── mask.hdr<br>"
             "    │   ├── sensor1.hdr<br>"
@@ -52,7 +65,7 @@ class LibraryWidget(GUIBase):
             "    │   ├── sensor2.hdr<br>"
             "    │   └── RGB.png (Optional)"
             "</pre>"
-            "<b>Step 2:</b> Specify the output folder name for results.<br>"
+            "<b>Step 2:</b> (Optional) Specify the output folder name for results.<br>"
             "<b>Step 3:</b> (Optional) Provide a path to a fingerprint file.<br>"
             "<b>Step 4:</b> Click 'Build' to create the library."
         )
@@ -60,27 +73,8 @@ class LibraryWidget(GUIBase):
         self._add([self.tutorial_label], 'Tutorial')
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
-              output_folder: str = "Library",
+              output: str = "Library",
               fingerprints: pathlib.Path = None):
-    """
-    Main function to construct a spectral library from a directory of samples.
-    Args:
-        input (pathlib.Path): Input directory containing sample folders.
-        The directory structure should be:
-        <input>
-            ├── sample1
-            │   ├── mask.hdr
-            │   ├── sensor1.hdr
-            │   ├── sensor2.hdr
-            │   └── RGB.png (Optional)
-            ├── sample2
-            │   ├── mask.hdr
-            │   ├── sensor1.hdr
-            │   ├── sensor2.hdr
-            │   └── RGB.png (Optional)
-        output_folder (str): Name of the output folder for results.
-        fingerprints (pathlib.Path): Optional path to fingerprint file.
-    """
     try:
         import plotly  # Check if plotly is installed for visualization
     except ImportError:
@@ -105,7 +99,7 @@ def construct(input: pathlib.Path = pathlib.Path(''),
     
     # Save the merged spectra to files and visualize
     for sensor_name, sensor_data in spectral_lib.items():
-        output_path = os.path.join(input.parent, output_folder)
+        output_path = os.path.join(input.parent, output)
         os.makedirs(output_path, exist_ok=True)
         lib_file = os.path.join(output_path, f"{sensor_name}.lib")
         io.save(lib_file, sensor_data)
