@@ -8,6 +8,7 @@ import math
 # Third-party imports
 import numpy as np
 from magicgui import magicgui
+from magicgui.widgets import Label
 from natsort import natsorted
 import hylite
 from hylite import io
@@ -33,6 +34,30 @@ class LibraryWidget(GUIBase):
             auto_call=False
         )
         self._add([self.test_widget], 'Construct Library')
+
+        # Add a tutorial text block below the widget
+        tutorial_text = (
+            "<b>Step 1:</b> Click 'Choose directory' for 'input'.<br>"
+            "The directory structure should be:"
+            "<pre>"
+            # "&lt;input&gt;<br>"
+            "    ├── sample1<br>"
+            "    │   ├── mask.hdr<br>"
+            "    │   ├── sensor1.hdr<br>"
+            "    │   ├── sensor2.hdr<br>"
+            "    │   └── RGB.png (Optional)<br>"
+            "    ├── sample2<br>"
+            "    │   ├── mask.hdr<br>"
+            "    │   ├── sensor1.hdr<br>"
+            "    │   ├── sensor2.hdr<br>"
+            "    │   └── RGB.png (Optional)"
+            "</pre>"
+            "<b>Step 2:</b> Specify the output folder name for results.<br>"
+            "<b>Step 3:</b> (Optional) Provide a path to a fingerprint file.<br>"
+            "<b>Step 4:</b> Click 'Build' to create the library."
+        )
+        self.tutorial_label = Label(value=tutorial_text)
+        self._add([self.tutorial_label], 'Tutorial')
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
               output_folder: str = "Library",
