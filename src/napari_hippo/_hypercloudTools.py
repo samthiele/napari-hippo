@@ -13,6 +13,8 @@ import numpy as np
 from magicgui import magicgui
 import napari
 from ._guiBase import GUIBase
+from qtpy.QtWidgets import QVBoxLayout, QPushButton, QWidget, QFrame, QGroupBox, QLabel, QScrollArea
+from qtpy.QtCore import Qt
 from napari_hippo import getByType, getLayer, View, HSICube, BW, ROI, Scene
 import hylite
 from hylite import io
@@ -24,12 +26,24 @@ class HypercloudToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 
+        # --- Group all function widgets ---
+        group_box = QGroupBox('')
+        group_layout = QVBoxLayout()
+        group_box.setLayout(group_layout)
+
         self.pointsize_widget = magicgui(setPointSize, call_button='Set')
-        self._add([self.pointsize_widget], 'Rendering')
+        self.pointsize_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Rendering</span>")
+        self.pointsize_label.setTextFormat(Qt.RichText)
+        group_layout.addWidget(self.pointsize_label)
+        group_layout.addWidget(self.pointsize_widget.root_native_widget)
 
         self.extractdata_widget = magicgui(extractData, call_button='Data Array')
         self.pointid_widget = magicgui(extractIDs, call_button='Point IDs')
-        self._add([self.extractdata_widget, self.pointid_widget], 'Extract')
+        self.extract_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Extract</span>")
+        self.extract_label.setTextFormat(Qt.RichText)
+        group_layout.addWidget(self.extract_label)
+        group_layout.addWidget(self.extractdata_widget.root_native_widget)
+        group_layout.addWidget(self.pointid_widget.root_native_widget)
 
         #self.fit_elc_widget = magicgui(ELC, call_button='Define/Apply ELC' )
         #self.apply_elc_widget = magicgui(applyELC, call_button='Apply Previous ELC' )
@@ -40,18 +54,68 @@ class HypercloudToolsWidget(GUIBase):
                                       refine_method={'choices':['None', 'SIFT', 'ORB']},
                                       ifov=dict(min=0, max=np.inf, step=0.005),
                                       call_button='Locate')
-        self._add([self.locate_widget], 'Camera Pose')
+        self.cameraPose_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Camera Pose</span>")
+        self.cameraPose_label.setTextFormat(Qt.RichText)
+        group_layout.addWidget(self.cameraPose_label)
+        group_layout.addWidget(self.locate_widget.root_native_widget)
 
         self.scene_widget = magicgui(buildScene, cloud={'mode': 'r', "filter":"*.ply"},
                                       camera={"mode": "r", "filter":"*.txt"},
                                       call_button='Build')
-        self._add([self.scene_widget], 'Scene')
+        self.scene_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Scene</span>")
+        self.scene_label.setTextFormat(Qt.RichText)
+        group_layout.addWidget(self.scene_label)
+        group_layout.addWidget(self.scene_widget.root_native_widget)
 
 
-        #root={'mode': 'd'}
+        # Add group box to a scroll area
+        function_scroll = QScrollArea()
+        function_scroll.setWidgetResizable(True)
+        function_scroll.setWidget(group_box)
+        function_scroll.setSizePolicy(group_box.sizePolicy())
+        function_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        # add spacer at the bottom of panel
-        self.qvl.addStretch()
+        # Create a vertical layout for the whole widget
+        main_layout = QVBoxLayout()
+        self.qvl.addLayout(main_layout)
+        main_layout.addWidget(function_scroll)
+
+        # --- Tutorial below ---
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+        self.add_tutorial(tutorial_text)
+
+        # Get the last widget added by add_tutorial (the scroll area)
+        tutorial_scroll = self.qvl.itemAt(self.qvl.count()-1).widget()
+        main_layout.addWidget(tutorial_scroll)
+
+        # Set stretch factors: functions 2/3, tutorial 1/3
+        main_layout.setStretch(0, 3)
+        main_layout.setStretch(1, 1)
 
 def setPointSize( size : int = 2 ):
     viewer = napari.current_viewer()  # get viewer
