@@ -5,10 +5,26 @@ from magicgui.widgets import Label
 
 # base class for GUI
 class GUIBase(QWidget):
+    # Singleton ToolManager for all GUIBase widgets
+    _tool_manager = None
+
     def __init__(self, napari_viewer):
         super().__init__()
         self.subwidgets = []
         self.viewer = napari_viewer
+
+        # Ensure only one tool widget is open at a time
+        if GUIBase._tool_manager is None:
+            from napari_hippo import ToolManager
+            GUIBase._tool_manager = ToolManager(napari_viewer)
+        else:
+            # Remove previous tool widget if it exists
+            if GUIBase._tool_manager.active_tool_widget is not None:
+                try:
+                    napari_viewer.window.remove_dock_widget(GUIBase._tool_manager.active_tool_widget)
+                except Exception:
+                    pass
+        GUIBase._tool_manager.active_tool_widget = self
 
         self.qvl = QVBoxLayout()
         self.setLayout(self.qvl)
