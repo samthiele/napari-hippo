@@ -17,13 +17,50 @@ class BasicWidget(GUIBase):
         super().__init__(napari_viewer)
 
         self.query_widget = magicgui(search, call_button='Search', root={'mode': 'd'}, auto_call=False)
-        self._add([self.query_widget], 'Batch')
 
         self.load_mask_widget = magicgui(loadMasks, call_button='Load/Create Masks', 
                                          mode={"choices": ['filename', 'directory']} )
         self.save_mask_widget = magicgui(saveMasks, call_button='Save/Apply Masks', 
                                          mode={"choices": ['Save to file', 'Set as nan', 'Nan and crop']})
-        self._add( [self.load_mask_widget, self.save_mask_widget], 'Mask' )
+
+        function_widgets = [self.query_widget,
+                            self.load_mask_widget,
+                            self.save_mask_widget]
+
+        function_labels = [
+            "Batch",
+            "Mask",
+            "",
+        ]
+
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def search( root : pathlib.Path = pathlib.Path(''),
             filter : str='*.png',

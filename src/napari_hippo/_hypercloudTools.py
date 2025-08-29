@@ -13,6 +13,8 @@ import numpy as np
 from magicgui import magicgui
 import napari
 from ._guiBase import GUIBase
+from qtpy.QtWidgets import QVBoxLayout, QPushButton, QWidget, QFrame, QGroupBox, QLabel, QScrollArea
+from qtpy.QtCore import Qt
 from napari_hippo import getByType, getLayer, View, HSICube, BW, ROI, Scene
 import hylite
 from hylite import io
@@ -23,36 +25,60 @@ from hylite.project import Camera
 class HypercloudToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
-
         self.pointsize_widget = magicgui(setPointSize, call_button='Set')
-        self._add([self.pointsize_widget], 'Rendering')
-
         self.extractdata_widget = magicgui(extractData, call_button='Data Array')
         self.pointid_widget = magicgui(extractIDs, call_button='Point IDs')
-        self._add([self.extractdata_widget, self.pointid_widget], 'Extract')
-
-        #self.fit_elc_widget = magicgui(ELC, call_button='Define/Apply ELC' )
-        #self.apply_elc_widget = magicgui(applyELC, call_button='Apply Previous ELC' )
-        #self._add([self.fit_elc_widget, self.apply_elc_widget], 'Quick Calibration')
-
         self.locate_widget = magicgui(locate, 
                                       projection={'choices':['panoramic', 'perspective']},
                                       refine_method={'choices':['None', 'SIFT', 'ORB']},
                                       ifov=dict(min=0, max=np.inf, step=0.005),
                                       call_button='Locate')
-        self._add([self.locate_widget], 'Camera Pose')
-
         self.scene_widget = magicgui(buildScene, cloud={'mode': 'r', "filter":"*.ply"},
                                       camera={"mode": "r", "filter":"*.txt"},
                                       call_button='Build')
-        self._add([self.scene_widget], 'Scene')
 
-
-        #root={'mode': 'd'}
-
-        # add spacer at the bottom of panel
-        self.qvl.addStretch()
-
+        function_widgets = [
+            self.pointsize_widget,
+            self.extractdata_widget,
+            self.pointid_widget,
+            self.locate_widget,
+            self.scene_widget
+        ]
+        function_labels = [
+            "Rendering",
+            "Extract",
+            "",
+            "Camera Pose",
+            "Scene"
+        ]
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
+        
 def setPointSize( size : int = 2 ):
     viewer = napari.current_viewer()  # get viewer
 

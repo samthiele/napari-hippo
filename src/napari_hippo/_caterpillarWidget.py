@@ -132,13 +132,48 @@ class CaterpillarWidget(GUIBase):
         super().__init__(napari_viewer)
 
         self.caterpillar_widget = magicgui(addCaterpillar, call_button='Create', auto_call=False)
-        self._add([self.caterpillar_widget], 'Spectral Caterpillar')
 
         self.export_widget = magicgui(export, call_button='Export', auto_call=False,
                                       filename={"mode": "w"},
                                       format={"choices": ['csv',
                                                           'txt','lib']})
-        self._add([self.export_widget], 'Export library')
+        
+        function_widgets = [
+            self.caterpillar_widget,
+            self.export_widget,
+        ]
+        function_labels = [
+            "Spectral Caterpillar",
+            "Export library",
+        ]
+
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 
 def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=False, quartiles=False ):

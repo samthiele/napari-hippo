@@ -27,26 +27,61 @@ import matplotlib.pyplot as plt
 class CoregToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
-
         self.simpleT_widget = magicgui( simpleT, call_button="Transforms")
         self.fit_widget = magicgui( fitExtent, call_button="Match Extent")
-        self._add([self.simpleT_widget, self.fit_widget], 'Simple Transforms')
-
         self.addKP_widget  = magicgui(addKP, call_button='Add/Load Target(s)')
         self.sortKP_widget = magicgui(matchKP, call_button='Match New KPs')
         self.fitAffine_widget = magicgui(fitAffine, call_button='Fit Affine')
         self.save_widget = magicgui(save, call_button='Save')
-        self._add([ self.addKP_widget,
-                    self.sortKP_widget,
-                    self.fitAffine_widget,
-                    self.save_widget], 'Coregister')
-
-        
         self.resample_widget = magicgui(resample, call_button='Apply Affine')
-        self._add([ self.resample_widget], "Resample" )
 
-        # add spacer at the bottom of panel
-        self.qvl.addStretch()
+        function_widgets = [
+            self.simpleT_widget,
+            self.fit_widget,
+            self.addKP_widget,
+            self.sortKP_widget,
+            self.fitAffine_widget,
+            self.save_widget,
+            self.resample_widget
+        ]
+        function_labels = [
+            "Simple Transforms",
+            "",
+            "Coregister",
+            "",
+            "",
+            "",
+            "Resample"
+        ]
+
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def fitExtent( base : 'napari.layers.Image' ):
     """
