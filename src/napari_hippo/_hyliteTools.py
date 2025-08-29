@@ -23,31 +23,17 @@ class HyliteToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
 
-        # --- Group all function widgets ---
-        group_box = QGroupBox('')
-        group_layout = QVBoxLayout()
-        group_box.setLayout(group_layout)
-
         self.calc_widget = magicgui(calculate, call_button='Calculate')
         self.stretch_widget = magicgui(stretch, call_button='Stretch',
                                       vmin=dict(min=-np.inf, max=np.inf, step=0.005),
                                       vmax=dict(min=-np.inf, max=np.inf, step=0.005),
                                       method={"choices": ['Absolute', 'Percent clip', 'Percent clip (per band)']})
-        self.calculate_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Calculate and visualise</span>")
-        self.calculate_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.calculate_label)
-        group_layout.addWidget(self.calc_widget.root_native_widget)
 
         self.hullCorrect_widget = magicgui(hullCorrect,
                                           wmin=dict(min=-np.inf, max=np.inf, step=1),
                                           wmax=dict(min=-np.inf, max=np.inf, step=1),
                                           call_button='Compute',
                                           auto_call=False)
-        
-        self.hullCorrect_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Hull correction</span>")
-        self.hullCorrect_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.hullCorrect_label)
-        group_layout.addWidget(self.hullCorrect_widget.root_native_widget)
 
         self.dimensionReduction_widget = magicgui(dimensionReduction,
                                                  method={"choices": ['PCA', 'MNF']},
@@ -56,30 +42,23 @@ class HyliteToolsWidget(GUIBase):
                                                  wmax=dict(min=-np.inf, max=np.inf, step=1),
                                                  call_button='Reduce',
                                                  auto_call=False)
-        self.dimensionReduction_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Dimension Reduction</span>")
-        self.dimensionReduction_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.dimensionReduction_label)
-        group_layout.addWidget(self.dimensionReduction_widget.root_native_widget)
 
         self.combine_widget = magicgui(combine,
                                        method={"choices": ['median (p50)', 'mean', 'brightest', 'darkest', 'p90', 'p75', 'p25', 'p10']},
                                        call_button='Compute')
-
-        self.combine_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Combine</span>")
-        group_layout.addWidget(self.combine_label)
-        group_layout.addWidget(self.combine_widget.root_native_widget)
-
-        # Add group box to a scroll area
-        function_scroll = QScrollArea()
-        function_scroll.setWidgetResizable(True)
-        function_scroll.setWidget(group_box)
-        function_scroll.setSizePolicy(group_box.sizePolicy())
-        function_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # Create a vertical layout for the whole widget
-        main_layout = QVBoxLayout()
-        self.qvl.addLayout(main_layout)
-        main_layout.addWidget(function_scroll)
+        
+        function_widgets = [self.calc_widget,
+                            self.stretch_widget,
+                            self.hullCorrect_widget,
+                            self.dimensionReduction_widget,
+                            self.combine_widget]
+        function_labels = [
+            "Calculate and visualise",
+            "",
+            "Hull Correction",
+            "Dimension Reduction",
+            "Combine",
+        ]
 
         # --- Tutorial below ---
         tutorial_text = (
@@ -108,15 +87,8 @@ class HyliteToolsWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_tutorial(tutorial_text)
 
-        # Get the last widget added by add_tutorial (the scroll area)
-        tutorial_scroll = self.qvl.itemAt(self.qvl.count()-1).widget()
-        main_layout.addWidget(tutorial_scroll)
-
-        # Set stretch factors: functions 2/3, tutorial 1/3
-        main_layout.setStretch(0, 2)
-        main_layout.setStretch(1, 1)
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def runOnImages( func, expand=False, all=False, add=False, suffix='', **kwargs ):
     """

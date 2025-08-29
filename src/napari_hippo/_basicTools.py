@@ -17,14 +17,22 @@ class BasicWidget(GUIBase):
         super().__init__(napari_viewer)
 
         self.query_widget = magicgui(search, call_button='Search', root={'mode': 'd'}, auto_call=False)
-        self._add([self.query_widget], 'Batch')
 
         self.load_mask_widget = magicgui(loadMasks, call_button='Load/Create Masks', 
                                          mode={"choices": ['filename', 'directory']} )
         self.save_mask_widget = magicgui(saveMasks, call_button='Save/Apply Masks', 
                                          mode={"choices": ['Save to file', 'Set as nan', 'Nan and crop']})
-        self._add( [self.load_mask_widget, self.save_mask_widget], 'Mask' )
-        # Tutorial text as QLabel inside QScrollArea
+
+        function_widgets = [self.query_widget,
+                            self.load_mask_widget,
+                            self.save_mask_widget]
+
+        function_labels = [
+            "Batch",
+            "Mask",
+            "",
+        ]
+
         tutorial_text = (
             "<b>Step 1:</b> TODO<br>"
             "Add more instructions here as needed.<br>"
@@ -51,7 +59,8 @@ class BasicWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_tutorial(tutorial_text)
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def search( root : pathlib.Path = pathlib.Path(''),
             filter : str='*.png',

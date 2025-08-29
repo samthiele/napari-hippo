@@ -25,62 +25,32 @@ from hylite.project import Camera
 class HypercloudToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
-
-        # --- Group all function widgets ---
-        group_box = QGroupBox('')
-        group_layout = QVBoxLayout()
-        group_box.setLayout(group_layout)
-
         self.pointsize_widget = magicgui(setPointSize, call_button='Set')
-        self.pointsize_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Rendering</span>")
-        self.pointsize_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.pointsize_label)
-        group_layout.addWidget(self.pointsize_widget.root_native_widget)
-
         self.extractdata_widget = magicgui(extractData, call_button='Data Array')
         self.pointid_widget = magicgui(extractIDs, call_button='Point IDs')
-        self.extract_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Extract</span>")
-        self.extract_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.extract_label)
-        group_layout.addWidget(self.extractdata_widget.root_native_widget)
-        group_layout.addWidget(self.pointid_widget.root_native_widget)
-
-        #self.fit_elc_widget = magicgui(ELC, call_button='Define/Apply ELC' )
-        #self.apply_elc_widget = magicgui(applyELC, call_button='Apply Previous ELC' )
-        #self._add([self.fit_elc_widget, self.apply_elc_widget], 'Quick Calibration')
-
         self.locate_widget = magicgui(locate, 
                                       projection={'choices':['panoramic', 'perspective']},
                                       refine_method={'choices':['None', 'SIFT', 'ORB']},
                                       ifov=dict(min=0, max=np.inf, step=0.005),
                                       call_button='Locate')
-        self.cameraPose_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Camera Pose</span>")
-        self.cameraPose_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.cameraPose_label)
-        group_layout.addWidget(self.locate_widget.root_native_widget)
-
         self.scene_widget = magicgui(buildScene, cloud={'mode': 'r', "filter":"*.ply"},
                                       camera={"mode": "r", "filter":"*.txt"},
                                       call_button='Build')
-        self.scene_label = QLabel("<span style='font-size:16pt; font-weight:bold'>Scene</span>")
-        self.scene_label.setTextFormat(Qt.RichText)
-        group_layout.addWidget(self.scene_label)
-        group_layout.addWidget(self.scene_widget.root_native_widget)
 
-
-        # Add group box to a scroll area
-        function_scroll = QScrollArea()
-        function_scroll.setWidgetResizable(True)
-        function_scroll.setWidget(group_box)
-        function_scroll.setSizePolicy(group_box.sizePolicy())
-        function_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # Create a vertical layout for the whole widget
-        main_layout = QVBoxLayout()
-        self.qvl.addLayout(main_layout)
-        main_layout.addWidget(function_scroll)
-
-        # --- Tutorial below ---
+        function_widgets = [
+            self.pointsize_widget,
+            self.extractdata_widget,
+            self.pointid_widget,
+            self.locate_widget,
+            self.scene_widget
+        ]
+        function_labels = [
+            "Rendering",
+            "Extract",
+            "",
+            "Camera Pose",
+            "Scene"
+        ]
         tutorial_text = (
             "<b>Step 1:</b> TODO<br>"
             "Add more instructions here as needed.<br>"
@@ -107,16 +77,8 @@ class HypercloudToolsWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_tutorial(tutorial_text)
-
-        # Get the last widget added by add_tutorial (the scroll area)
-        tutorial_scroll = self.qvl.itemAt(self.qvl.count()-1).widget()
-        main_layout.addWidget(tutorial_scroll)
-
-        # Set stretch factors: functions 2/3, tutorial 1/3
-        main_layout.setStretch(0, 3)
-        main_layout.setStretch(1, 1)
-
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
+        
 def setPointSize( size : int = 2 ):
     viewer = napari.current_viewer()  # get viewer
 

@@ -36,9 +36,9 @@ class LibraryWidget(GUIBase):
             auto_call=False
         )
 
-        self._add([self.lib_widget], 'Construct Library')
+        function_widgets = [self.lib_widget]
+        function_labels = ['Library']
 
-        # When input is chosen, set output to base directory of input + '/Library'
         def set_output_based_on_input(event):
             input_path = self.lib_widget.input.value
             if input_path and input_path != pathlib.Path(''):
@@ -48,7 +48,6 @@ class LibraryWidget(GUIBase):
 
         self.lib_widget.input.changed.connect(set_output_based_on_input)
 
-        # Tutorial text
         tutorial_text = (
             "<b>Step 1:</b> Click 'Choose directory' for 'input'.<br>"
             "The directory structure should be:"
@@ -69,8 +68,8 @@ class LibraryWidget(GUIBase):
             "<b>Step 3:</b> (Optional) Provide a path to a fingerprint file.<br>"
             "<b>Step 4:</b> Click 'Build' to create the library."
         )
-        self.tutorial_label = Label(value=tutorial_text)
-        self._add([self.tutorial_label], 'Tutorial')
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(0,0))
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
               output: str = "Library",

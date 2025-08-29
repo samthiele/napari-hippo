@@ -132,13 +132,20 @@ class CaterpillarWidget(GUIBase):
         super().__init__(napari_viewer)
 
         self.caterpillar_widget = magicgui(addCaterpillar, call_button='Create', auto_call=False)
-        self._add([self.caterpillar_widget], 'Spectral Caterpillar')
 
         self.export_widget = magicgui(export, call_button='Export', auto_call=False,
                                       filename={"mode": "w"},
                                       format={"choices": ['csv',
                                                           'txt','lib']})
-        self._add([self.export_widget], 'Export library')
+        
+        function_widgets = [
+            self.caterpillar_widget,
+            self.export_widget,
+        ]
+        function_labels = [
+            "Spectral Caterpillar",
+            "Export library",
+        ]
 
         tutorial_text = (
             "<b>Step 1:</b> TODO<br>"
@@ -166,7 +173,7 @@ class CaterpillarWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_tutorial(tutorial_text)
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 
 def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=False, quartiles=False ):
