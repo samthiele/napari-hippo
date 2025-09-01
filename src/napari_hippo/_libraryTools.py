@@ -69,7 +69,7 @@ class LibraryWidget(GUIBase):
             "<b>Step 4:</b> Click 'Build' to create the library."
         )
 
-        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(0,0))
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
               output: str = "Library",

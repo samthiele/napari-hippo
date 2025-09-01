@@ -26,8 +26,8 @@ class GUIBase(QWidget):
                     pass
         GUIBase._tool_manager.active_tool_widget = self
 
-        self.qvl = QVBoxLayout()
-        self.setLayout(self.qvl)
+        # self.qvl = QVBoxLayout()
+        # self.setLayout(self.qvl)
 
     def _add(self, elements, groupname, tutorialstring=None):
         bx = QGroupBox(groupname)
@@ -55,53 +55,52 @@ class GUIBase(QWidget):
         function_labels: list of str, optional, labels for each function widget (bold, large)
         stretch: tuple, stretch factors for (functions, tutorial)
         """
-        from qtpy.QtWidgets import QVBoxLayout, QScrollArea, QLabel, QWidget
+        from qtpy.QtWidgets import QVBoxLayout, QScrollArea, QLabel, QWidget, QGroupBox
         from qtpy.QtCore import Qt
 
-        main_layout = QVBoxLayout()
-        self.qvl.addLayout(main_layout)
+        main_layout = QVBoxLayout(self)
+        # self.qvl.addLayout(main_layout)
 
-        # --- Functions section ---
-        func_box = QWidget()
-        func_layout = QVBoxLayout()
-        func_box.setLayout(func_layout)
+        # --- Function scrollable area ---
+        function_widget = QWidget()
+        function_layout = QVBoxLayout(function_widget)
         if function_labels is None:
             function_labels = [None] * len(function_widgets)
         for w, label in zip(function_widgets, function_labels):
             if label:
                 lbl = QLabel(f"<span style='font-size:16pt; font-weight:bold'>{label}</span>")
                 lbl.setTextFormat(Qt.RichText)
-                func_layout.addWidget(lbl)
+                function_layout.addWidget(lbl)
             if hasattr(w, "root_native_widget"):
-                func_layout.addWidget(w.root_native_widget)
+                function_layout.addWidget(w.root_native_widget)
             else:
-                func_layout.addWidget(w)
-        func_layout.addStretch()
-        func_scroll = QScrollArea()
-        func_scroll.setWidgetResizable(True)
-        func_scroll.setWidget(func_box)
-        func_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        main_layout.addWidget(func_scroll)
+                function_layout.addWidget(w)
+        function_layout.addStretch()
+        function_scroll = QScrollArea()
+        function_scroll.setWidget(function_widget)
+        function_scroll.setWidgetResizable(True)
+        function_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        # --- Tutorial section ---
+        # --- Tutorial scrollable area ---
+        tutorial_widget = QWidget()
+        tutorial_layout = QVBoxLayout(tutorial_widget)
         tutorial_group = QGroupBox("Tutorial")
         tutorial_group.setStyleSheet("QGroupBox { font-size:16pt; font-weight: bold; }")
-        tutorial_layout = QVBoxLayout()
-        tutorial_group.setLayout(tutorial_layout)
-
+        tutorial_inner_layout = QVBoxLayout()
+        tutorial_group.setLayout(tutorial_inner_layout)
         tutorial_label = QLabel()
         tutorial_label.setTextFormat(Qt.RichText)
         tutorial_label.setText(f"<span style='font-weight:normal'>{tutorial_text}</span>")
         tutorial_label.setWordWrap(True)
-        tutorial_layout.addWidget(tutorial_label)
-        tutorial_layout.addStretch()
-
+        tutorial_inner_layout.addWidget(tutorial_label)
+        # tutorial_inner_layout.addStretch()
+        tutorial_layout.addWidget(tutorial_group)
         tutorial_scroll = QScrollArea()
+        tutorial_scroll.setWidget(tutorial_widget)
         tutorial_scroll.setWidgetResizable(True)
-        tutorial_scroll.setWidget(tutorial_group)
         tutorial_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        main_layout.addWidget(tutorial_scroll)
 
-        # Set stretch factors
-        main_layout.setStretch(0, stretch[0])
-        main_layout.setStretch(1, stretch[1])
+        # Add both scroll areas to main layout with stretch factors
+        main_layout.addWidget(function_scroll, stretch=stretch[0])
+        main_layout.addWidget(tutorial_scroll, stretch=stretch[1])
+        self.setLayout(main_layout)
