@@ -88,7 +88,7 @@ class HyliteToolsWidget(GUIBase):
             "<b>Step 20:</b> TODO<br>"
         )
 
-        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def runOnImages( func, expand=False, all=False, add=False, suffix='', **kwargs ):
     """

@@ -173,7 +173,7 @@ class CaterpillarWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 
 def addCaterpillar( base_image : 'napari.layers.Image', query_points : 'napari.layers.Points', median=False, quartiles=False ):

@@ -26,9 +26,6 @@ class GUIBase(QWidget):
                     pass
         GUIBase._tool_manager.active_tool_widget = self
 
-        # self.qvl = QVBoxLayout()
-        # self.setLayout(self.qvl)
-
     def _add(self, elements, groupname, tutorialstring=None):
         bx = QGroupBox(groupname)
         vbox = QVBoxLayout()

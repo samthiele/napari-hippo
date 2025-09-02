@@ -77,7 +77,7 @@ class HypercloudToolsWidget(GUIBase):
             "<b>Step 19:</b> TODO<br>"
             "<b>Step 20:</b> TODO<br>"
         )
-        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
         
 def setPointSize( size : int = 2 ):
     viewer = napari.current_viewer()  # get viewer
