@@ -3,10 +3,12 @@ import os
 import glob
 import pathlib
 import copy
+import math
 
 # Third-party imports
 import numpy as np
 from magicgui import magicgui
+from magicgui.widgets import Label
 from natsort import natsorted
 import hylite
 from hylite import io
@@ -23,38 +25,55 @@ class LibraryWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
         # Setup the magicgui widget for library construction
-        self.test_widget = magicgui(
+        self.lib_widget = magicgui(
             construct,
             input={'mode': 'd'},
-            output_folder={"widget_type": "LineEdit"},
+            output={
+                "widget_type": "LineEdit",
+            },
             fingerprints={"filter": "*.json"},
             call_button='Build',
             auto_call=False
         )
-        self._add([self.test_widget], 'Construct Library')
+
+        function_widgets = [self.lib_widget]
+        function_labels = ['Library']
+
+        def set_output_based_on_input(event):
+            input_path = self.lib_widget.input.value
+            if input_path and input_path != pathlib.Path(''):
+                base_dir = input_path.parent
+                default_output = base_dir / "Library"
+                self.lib_widget.output.value = default_output
+
+        self.lib_widget.input.changed.connect(set_output_based_on_input)
+
+        tutorial_text = (
+            "<b>Step 1:</b> Click 'Choose directory' for 'input'.<br>"
+            "The directory structure should be:"
+            "<pre>"
+            "&lt;input&gt;<br>"
+            "    ├── sample1<br>"
+            "    │   ├── mask.hdr<br>"
+            "    │   ├── sensor1.hdr<br>"
+            "    │   ├── sensor2.hdr<br>"
+            "    │   └── RGB.png (Optional)<br>"
+            "    ├── sample2<br>"
+            "    │   ├── mask.hdr<br>"
+            "    │   ├── sensor1.hdr<br>"
+            "    │   ├── sensor2.hdr<br>"
+            "    │   └── RGB.png (Optional)"
+            "</pre>"
+            "<b>Step 2:</b> (Optional) Specify the output folder name for results.<br>"
+            "<b>Step 3:</b> (Optional) Provide a path to a fingerprint file.<br>"
+            "<b>Step 4:</b> Click 'Build' to create the library."
+        )
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
-              output_folder: str = "Library",
+              output: str = "Library",
               fingerprints: pathlib.Path = None):
-    """
-    Main function to construct a spectral library from a directory of samples.
-    Args:
-        input (pathlib.Path): Input directory containing sample folders.
-        The directory structure should be:
-        <input>
-            ├── sample1
-            │   ├── mask.hdr
-            │   ├── sensor1.hdr
-            │   ├── sensor2.hdr
-            │   └── RGB.png (Optional)
-            ├── sample2
-            │   ├── mask.hdr
-            │   ├── sensor1.hdr
-            │   ├── sensor2.hdr
-            │   └── RGB.png (Optional)
-        output_folder (str): Name of the output folder for results.
-        fingerprints (pathlib.Path): Optional path to fingerprint file.
-    """
     try:
         import plotly  # Check if plotly is installed for visualization
     except ImportError:
@@ -79,7 +98,7 @@ def construct(input: pathlib.Path = pathlib.Path(''),
     
     # Save the merged spectra to files and visualize
     for sensor_name, sensor_data in spectral_lib.items():
-        output_path = os.path.join(input.parent, output_folder)
+        output_path = os.path.join(input.parent, output)
         os.makedirs(output_path, exist_ok=True)
         lib_file = os.path.join(output_path, f"{sensor_name}.lib")
         io.save(lib_file, sensor_data)
@@ -128,38 +147,89 @@ def merge_spectra(spectra1, spectra2):
 
 def create_masked_image(folder_path):
     """
-    Create a new RGB_masked.png image with mask overlay for a given folder.
+    Create a new RGB_masked.png image with colored mask overlay.
+    Colors are assigned based on mask levels - similar levels get similar colors.
+    
     Args:
-        folder_path (str): Path to the folder containing RGB and mask files.
+        folder_path (str): Path to the folder containing RGB and mask files
     """
     try:
         import cv2
+        import colorsys
     except ImportError:
         print('cv2 (OpenCV) is not installed. RGB_masked.png will not be created.')
         return
 
     rgb_path = os.path.join(folder_path, 'RGB.png')
     mask_path = os.path.join(folder_path, 'mask.hdr')
+    
     # Check if files exist
-    if not os.path.exists(rgb_path):
-        print(f'RGB image not found: {rgb_path}')
+    if not os.path.exists(rgb_path) or not os.path.exists(mask_path):
+        print(f'Required files not found in: {folder_path}')
         return
-    if not os.path.exists(mask_path):
-        print(f'Mask file not found: {mask_path}')
-        return
+
+    # Load images
     image = cv2.imread(rgb_path)
     mask = io.load(mask_path)
-    ratio = int(image.shape[0] / mask.data.shape[1])
+    
+    
+    # Resize RGB image
+    ratio = round(image.shape[0] / mask.data.shape[1])
     new_width = image.shape[0] // ratio
     new_height = image.shape[1] // ratio 
     output_image = cv2.resize(image, (new_height, new_width))
+    
+    # Process mask
     mask_data = mask.data.astype(np.uint8)
     mask_data = mask_data.T[0]
-    contours, _ = cv2.findContours(mask_data, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for i, contour in enumerate(contours):
-        cv2.drawContours(output_image, [contour], -1, (0, 0, 255), 2)
-    folder_location = os.path.dirname(rgb_path)
-    cv2.imwrite(os.path.join(folder_location, 'RGB_masked.png'), output_image)
+    unique_levels = np.unique(mask_data)
+    
+    # Generate colors for each unique mask level
+    # Skip 0 as it's typically background
+    num_colors = len(unique_levels) - 1 if 0 in unique_levels else len(unique_levels)
+    colors = {}
+    
+    for idx, level in enumerate(unique_levels):
+        if level == 0:  # Skip background
+            continue
+        # Generate colors using HSV color space for better distinction
+        hue = (idx - 1) / num_colors
+        rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.8)
+        # Convert to BGR for OpenCV
+        colors[level] = (int(rgb[2] * 255), int(rgb[1] * 255), int(rgb[0] * 255))
+    
+    # Create mask overlay
+    overlay = output_image.copy()
+    for level, color in colors.items():
+        # Create binary mask for this level
+        level_mask = (mask_data == level)
+        contours, _ = cv2.findContours(level_mask.astype(np.uint8), 
+                                     cv2.RETR_EXTERNAL, 
+                                     cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Draw contours and fill
+        cv2.drawContours(overlay, contours, -1, color, -1)  # Fill
+        cv2.drawContours(overlay, contours, -1, color, 2)   # Border
+        
+        # Add labels
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                cv2.putText(overlay, str(level), (cx, cy),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                          (0, 0, 255), 1)
+    
+    # Blend original image with overlay
+    alpha = 0.3  # Transparency factor
+    output_image = cv2.addWeighted(overlay, alpha, output_image, 1 - alpha, 0)
+    
+    # Save result
+    output_path = os.path.join(folder_path, 'RGB_masked.png')
+    cv2.imwrite(output_path, output_image)
+    print(f'Saved masked image to: {output_path}')
+
 
 def create_masked_spec(folder_path):
     """

@@ -23,7 +23,6 @@ import os
 class AnnotToolsWidget(GUIBase):
     def __init__(self, napari_viewer):
         super().__init__(napari_viewer)
-
         self.load_widget = magicgui(loadAnnot, call_button='Load')
         self.transpose_widget = magicgui(transpose, call_button='Transpose')
         self.update_widget = magicgui(setLabel, call_button='Update')
@@ -32,15 +31,48 @@ class AnnotToolsWidget(GUIBase):
                                     )
         self.export_widget = magicgui(export, call_button='Export Patches',
                                              filename={"mode": "w", "filter":"*.hyc"})
-        self._add( [self.load_widget, 
-                    self.transpose_widget,
-                    self.update_widget,
-                    self.save_widget,
-                    self.export_widget,
-                    ], 'Annotate' )
 
-        # add spacer at the bottom of panel
-        self.qvl.addStretch()
+        function_widgets = [self.load_widget,
+                            self.transpose_widget,
+                            self.update_widget,
+                            self.save_widget,
+                            self.export_widget]
+        function_labels = [
+            "Annotate",
+            "",
+            "",
+            "",
+            ""
+        ]
+
+        tutorial_text = (
+            "<b>Step 1:</b> TODO<br>"
+            "Add more instructions here as needed.<br>"
+            "You can extend this tutorial and it will remain scrollable.<br>"
+            "Example:<br>"
+            "<b>Step 1:</b> TODO<br>"
+            "<b>Step 2:</b> TODO<br>"
+            "<b>Step 3:</b> TODO<br>"
+            "<b>Step 4:</b> TODO<br>"
+            "<b>Step 5:</b> TODO<br>"
+            "<b>Step 6:</b> TODO<br>"
+            "<b>Step 7:</b> TODO<br>"
+            "<b>Step 8:</b> TODO<br>"
+            "<b>Step 9:</b> TODO<br>"
+            "<b>Step 10:</b> TODO<br>"
+            "<b>Step 11:</b> TODO<br>"
+            "<b>Step 12:</b> TODO<br>"
+            "<b>Step 13:</b> TODO<br>"
+            "<b>Step 14:</b> TODO<br>"
+            "<b>Step 15:</b> TODO<br>"
+            "<b>Step 16:</b> TODO<br>"
+            "<b>Step 17:</b> TODO<br>"
+            "<b>Step 18:</b> TODO<br>"
+            "<b>Step 19:</b> TODO<br>"
+            "<b>Step 20:</b> TODO<br>"
+        )
+
+        self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
 def loadAnnot( ):
     viewer = napari.current_viewer()  # get viewer

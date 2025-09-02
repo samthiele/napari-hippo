@@ -26,6 +26,30 @@ __all__ = (
     "AnnotToolsWidget",
 )
 
+# ToolManager to ensure only one tool widget is open at a time
+class ToolManager:
+    def __init__(self, viewer):
+        self.viewer = viewer
+        self.active_tool_widget = None
+
+    def open_tool(self, tool_cls):
+        # Remove previous tool widget if it exists
+        if self.active_tool_widget is not None:
+            try:
+                self.viewer.window.remove_dock_widget(self.active_tool_widget)
+            except Exception:
+                pass  # Already removed or not docked
+
+        # Create and add new tool widget
+        new_widget = tool_cls(self.viewer)
+        self.viewer.window.add_dock_widget(new_widget, name=tool_cls.__name__, area='right')
+        self.active_tool_widget = new_widget
+
+# Example usage:
+# tool_manager = ToolManager(viewer)
+# tool_manager.open_tool(BasicWidget)   # Opens Basic tool
+# tool_manager.open_tool(LibraryWidget) # Closes Basic, opens Library
+
 # setup plugin callbacks
 import napari
 import os
