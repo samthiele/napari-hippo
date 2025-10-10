@@ -409,8 +409,9 @@ def fitAffine( base : 'napari.layers.Image' ):
 
             # find matching kps
             KP, Txt = kp.toList(world=img.layer)
-            kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
-            kp2 = np.array([keypoints[t] for k,t in zip(KP,Txt) if t in keypoints])
+            kp1 = np.array([to_2d(k) for k,t in zip(KP,Txt) if t in keypoints])
+            kp2 = np.array([to_2d(keypoints[t]) for k,t in zip(KP,Txt) if t in keypoints])
+
             if len(kp1) <= 3:
                 napari.utils.notifications.show_error(
                 "Less than three matching keypoints found for %s."%img.layer.name )
@@ -423,16 +424,32 @@ def fitAffine( base : 'napari.layers.Image' ):
             
             # repeat, but for keypoints
             KP, Txt = kp.toList(world=False)
-            kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
+            kp1 = np.array([to_2d(k) for k,t in zip(KP,Txt) if t in keypoints])
+            kp2 = np.array([to_2d(keypoints[t]) for k,t in zip(KP,Txt) if t in keypoints])
             affine, inliers = _est_affine(kp1,kp2)
             kp.layer.affine = affine
 
         # estimate residual for testing purposes
         KP, Txt = kp.toList(world=True) # N.B. this checks in world coords!
-        kp1 = np.array([k for k,t in zip(KP,Txt) if t in keypoints])
+        kp1 = np.array([to_2d(k) for k,t in zip(KP,Txt) if t in keypoints])
+        kp2 = np.array([to_2d(keypoints[t]) for k,t in zip(KP,Txt) if t in keypoints])
         resid = np.mean( np.abs( kp1[inliers] - kp2[inliers] ) )
         return resid # return residual for testing purposes
-    
+
+def to_2d(pt):
+    '''
+    Ensure keypoint is 2D by stripping leading zeros if needed.
+    '''
+    arr = np.asarray(pt)
+    if arr.shape[0] == 2:
+        return arr
+    elif arr.shape[0] > 2 and np.all(arr[:arr.shape[0]-2] == 0):
+        # Remove leading zeros if present
+        return arr[-2:]
+    else:
+        napari.utils.notifications.show_error("Keypoint shape is %d, not 2D"%(arr.shape[0]))
+        return arr
+
 def save():
     """
     Save keypoints and associated affine transforms to disk.
