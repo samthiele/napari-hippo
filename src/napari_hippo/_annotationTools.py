@@ -46,31 +46,20 @@ class AnnotToolsWidget(GUIBase):
         ]
 
         tutorial_text = (
-            "<b>Step 1:</b> TODO<br>"
-            "Add more instructions here as needed.<br>"
-            "You can extend this tutorial and it will remain scrollable.<br>"
-            "Example:<br>"
-            "<b>Step 1:</b> TODO<br>"
-            "<b>Step 2:</b> TODO<br>"
-            "<b>Step 3:</b> TODO<br>"
-            "<b>Step 4:</b> TODO<br>"
-            "<b>Step 5:</b> TODO<br>"
-            "<b>Step 6:</b> TODO<br>"
-            "<b>Step 7:</b> TODO<br>"
-            "<b>Step 8:</b> TODO<br>"
-            "<b>Step 9:</b> TODO<br>"
-            "<b>Step 10:</b> TODO<br>"
-            "<b>Step 11:</b> TODO<br>"
-            "<b>Step 12:</b> TODO<br>"
-            "<b>Step 13:</b> TODO<br>"
-            "<b>Step 14:</b> TODO<br>"
-            "<b>Step 15:</b> TODO<br>"
-            "<b>Step 16:</b> TODO<br>"
-            "<b>Step 17:</b> TODO<br>"
-            "<b>Step 18:</b> TODO<br>"
-            "<b>Step 19:</b> TODO<br>"
-            "<b>Step 20:</b> TODO<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 1:</b> Select one image that you want to annotate<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 2:</b> Click 'Load'<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 3:</b> Select [ROI] from the layer list<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 4:</b> Draw a rectangle on the desired sample<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 5:</b> In 'label', write the name of the sample<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 6:</b> Click 'Update'<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 7:</b> Repeat for all samples of interest<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 8:</b> Select 'format' from the dropdown<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 9:</b> Click 'Save'<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 10:</b> In the 'filename', select the desired output folder location<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 11:</b> Select all the images with [ROI]<br>"
+            "&nbsp;&nbsp;&nbsp; <b>Step 12:</b> Click 'Export Patches'<br>"
         )
+        
 
         self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
 
