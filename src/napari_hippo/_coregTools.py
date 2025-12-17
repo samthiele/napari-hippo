@@ -280,18 +280,9 @@ def addKP():
                 img = getLayer(l).toHyImage()
                 if 'affine' in img.header:
                     # load affine matrix from header
-                    affine_list = img.header.get_list('affine')
-                    if len(affine_list) == 6:
-                        # Flattened 2D affine (6 elements: [a00, a01, a02, a10, a11, a12])
-                        A = np.eye(3)
-                        A[0,:] = affine_list[:3]
-                        A[1,:] = affine_list[3:6]
-                    elif len(affine_list) == 9:
-                        # Full 3x3 affine matrix
-                        A = np.array(affine_list).reshape(3, 3)
-                    else:
-                        # Fallback to identity
-                        A = np.eye(3)
+                    A = np.eye(3)
+                    A[0,:] = img.header.get_list('affine')[:3]
+                    A[1,:] = img.header.get_list('affine')[3:6]
 
                     # set it for both image and keypoints
                     l.affine = A
