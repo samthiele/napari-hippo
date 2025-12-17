@@ -390,8 +390,9 @@ def fitAffine( base : 'napari.layers.Image' ):
         base_hyimage = base_image.toHyImage()
         base_points = R[m[0]]
         base_image.layer.affine = np.eye(3)
-        base_image.affine = np.eye(3)
+        base_image.affine = np.hstack([np.eye(3)[0,:], np.eye(3)[1,:]]) # store flattened affine
         base_points.layer.affine = np.eye(3)
+       
 
         bKP, bTxt = base_points.toList(world=base_image.layer)
         keypoints = dict(zip(bTxt, bKP))
