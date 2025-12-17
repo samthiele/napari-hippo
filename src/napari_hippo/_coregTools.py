@@ -275,7 +275,7 @@ def addKP():
                     # load affine matrix from header
                     A = np.eye(3)
                     A[0,:] = img.header.get_list('affine')[:3]
-                    A[1,:] = img.header.get_list('affine')[3:]
+                    A[1,:] = img.header.get_list('affine')[3:6]
 
                     # set it for both image and keypoints
                     l.affine = A
