@@ -41,10 +41,7 @@ class LibraryWidget(GUIBase):
 
         def set_output_based_on_input(event):
             input_path = self.lib_widget.input.value
-            if input_path and input_path != pathlib.Path(''):
-                base_dir = input_path.parent
-                default_output = base_dir / "Library"
-                self.lib_widget.output.value = default_output
+            self.lib_widget.output.value = input_path / "Library"
 
         self.lib_widget.input.changed.connect(set_output_based_on_input)
 
@@ -53,23 +50,26 @@ class LibraryWidget(GUIBase):
             "The directory structure should be:"
             "<pre>"
             "&lt;input&gt;<br>"
-            "    ├── sample1<br>"
-            "    │   ├── mask.hdr<br>"
-            "    │   ├── sensor1.hdr<br>"
-            "    │   ├── sensor2.hdr<br>"
-            "    │   └── RGB.png (Optional)<br>"
-            "    ├── sample2<br>"
-            "    │   ├── mask.hdr<br>"
-            "    │   ├── sensor1.hdr<br>"
-            "    │   ├── sensor2.hdr<br>"
-            "    │   └── RGB.png (Optional)"
+            "    ├── mask.hdr<br>"
+            "    ├── sensor1.hdr<br>"
+            "    ├── sensor2.hdr<br>"
+            "    └── RGB.png (Optional)<br>"
             "</pre>"
             "<b>Step 2:</b> (Optional) Specify the output folder name for results.<br>"
             "<b>Step 3:</b> (Optional) Provide a path to a fingerprint file.<br>"
-            "<b>Step 4:</b> Click 'Build' to create the library."
+            "<b>Step 4:</b> Click 'Build' to create the library.<br>"
+            "<br>"
+            "Finally, it will create a 'Library' folder in the input folder containing the spectral library files and visualizations htmls."
         )
 
         self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(1,1))
+
+        # Store widgets for updating layer choices when layers are added/removed
+        self.subwidgets = function_widgets
+        
+        # Connect viewer layer events to update widget choices when layers are added/removed
+        napari_viewer.layers.events.inserted.connect(self._update_layer_choices)
+        napari_viewer.layers.events.removed.connect(self._update_layer_choices)
 
 def construct(input: pathlib.Path = pathlib.Path(''), 
               output: str = "Library",
@@ -87,14 +87,11 @@ def construct(input: pathlib.Path = pathlib.Path(''),
 
     # Iterate through all subdirectories and build the spectral library
     spectral_lib = None
-    for root, dirs, _ in os.walk(input):
-        for dir_name in dirs:
-            full_dir_path = os.path.join(root, dir_name)
-            create_masked_image(full_dir_path)
-            if spectral_lib is None:
-                spectral_lib = create_masked_spec(full_dir_path)
-            else:
-                spectral_lib = merge_spectra(spectral_lib, create_masked_spec(full_dir_path))
+    create_masked_image(input)
+    if spectral_lib is None:
+        spectral_lib = create_masked_spec(input)
+    else:
+        spectral_lib = merge_spectra(spectral_lib, create_masked_spec(input))
     
     # Save the merged spectra to files and visualize
     for sensor_name, sensor_data in spectral_lib.items():

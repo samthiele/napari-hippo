@@ -71,6 +71,13 @@ class CoregToolsWidget(GUIBase):
         )
 
         self.add_scrollable_sections(function_widgets, tutorial_text, function_labels, stretch=(2,1))
+        
+        # Store widgets for updating layer choices when layers are added/removed
+        self.subwidgets = function_widgets
+        
+        # Connect viewer layer events to update widget choices when layers are added/removed
+        napari_viewer.layers.events.inserted.connect(self._update_layer_choices)
+        napari_viewer.layers.events.removed.connect(self._update_layer_choices)
 
 def fitExtent( base : 'napari.layers.Image' ):
     """
@@ -275,7 +282,7 @@ def addKP():
                     # load affine matrix from header
                     A = np.eye(3)
                     A[0,:] = img.header.get_list('affine')[:3]
-                    A[1,:] = img.header.get_list('affine')[3:]
+                    A[1,:] = img.header.get_list('affine')[3:6]
 
                     # set it for both image and keypoints
                     l.affine = A
@@ -383,8 +390,9 @@ def fitAffine( base : 'napari.layers.Image' ):
         base_hyimage = base_image.toHyImage()
         base_points = R[m[0]]
         base_image.layer.affine = np.eye(3)
-        base_image.affine = np.eye(3)
+        base_image.affine = np.hstack([np.eye(3)[0,:], np.eye(3)[1,:]]) # store flattened affine
         base_points.layer.affine = np.eye(3)
+       
 
         bKP, bTxt = base_points.toList(world=base_image.layer)
         keypoints = dict(zip(bTxt, bKP))

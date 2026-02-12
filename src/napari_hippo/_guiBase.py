@@ -43,6 +43,31 @@ class GUIBase(QWidget):
     def reset_choices(self, event=None):
         for e in self.subwidgets:
             e.reset_choices()
+    
+    def _update_layer_choices(self, event=None):
+        """Update the layer choices in all magicgui widgets based on current viewer layers."""
+        import napari
+        viewer = self.viewer
+        image_layers = [l for l in viewer.layers if isinstance(l, napari.layers.Image)]
+        point_layers = [l for l in viewer.layers if isinstance(l, napari.layers.Points)]
+        
+        # Update choices for magicgui widgets that have layer parameters
+        for widget in self.subwidgets:
+            # Image layer parameters
+            if hasattr(widget, 'base') and hasattr(widget.base, 'choices'):
+                widget.base.choices = image_layers
+            if hasattr(widget, 'base_image') and hasattr(widget.base_image, 'choices'):
+                widget.base_image.choices = image_layers
+            if hasattr(widget, 'target_image') and hasattr(widget.target_image, 'choices'):
+                widget.target_image.choices = image_layers
+            if hasattr(widget, 'source_image') and hasattr(widget.source_image, 'choices'):
+                widget.source_image.choices = image_layers
+            
+            # Point layer parameters
+            if hasattr(widget, 'query_points') and hasattr(widget.query_points, 'choices'):
+                widget.query_points.choices = point_layers
+            if hasattr(widget, 'points') and hasattr(widget.points, 'choices'):
+                widget.points.choices = point_layers
 
     def add_scrollable_sections(self, function_widgets, tutorial_text, function_labels=None, stretch=(2,1)):
         """
