@@ -85,7 +85,19 @@ class HippoData( object ):
         properties that are shared between the data object and the napari layers metadata dictionary. Note that to ensure safe
         multi-threading these should be kept simple (i.e. primitive types or small numpy arrays).
         """
-        self.layer = layer # store link to layer
+        # Store link to napari layer object.
+        #
+        # IMPORTANT: do *not* write the layer object into `layer.metadata`.
+        # `layer.metadata` is intended for simple, serializable values; storing
+        # a napari Layer here can break deepcopy/pickling (e.g. during export).
+        object.__setattr__(self, "layer", layer)
+
+        # If older versions accidentally persisted a back-reference, remove it.
+        try:
+            if self.layer.metadata.get("layer", None) is self.layer:
+                del self.layer.metadata["layer"]
+        except Exception:
+            pass
 
         # pull also any properties that exist already in the layer metdata
         for k,v in self.layer.metadata.items():
@@ -107,6 +119,8 @@ class HippoData( object ):
 
     def __setattr__( self, name : str, value ):
         object.__setattr__(self, name, value ) # set class attribute
+        if name == "layer":
+            return # don't put this in the header! 
         if '__' not in name: # ignore private attributes
             self.layer.metadata[name] = value # update metadata
     

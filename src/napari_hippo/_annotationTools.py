@@ -229,6 +229,11 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
     # create output HyCollection
     O = hylite.HyCollection(os.path.basename(filename), os.path.dirname(filename))
 
+    # Build spectral libraries across all exported images.
+    # Keys are the exported image names (`iname`), values are dict[label] -> list[spectra].
+    library = {}
+    wav = {}
+
     for _image in images: # loop through image layers 
         # get HyImage data from each layer to export
         # (noting that Stacks will contain data from multiple images)
@@ -243,14 +248,19 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
                     ilist.append( io.load(p) ) # load HSI
                 else:
                     ilist.append(s) # else, just export RGB slice
-        else:
+        elif isinstance(_image, (RGB, RGBA, BW)): # RGB files or RGB preview files
+            ilist = [_image.toHyImage()] # easy!
+            iname = [os.path.splitext( os.path.basename(_image.path))[0]]
+            p = os.path.splitext(_image.path)[0] + '.hdr' # also add .hdr file if it exists
+            if os.path.exists(p):
+                ilist.append(io.load(p)) # HSI file
+                iname.append(os.path.splitext(os.path.basename(p))[0])
+        else: # HSI files; easy
             ilist = [_image.toHyImage()] # easy!
             iname = [os.path.splitext( os.path.basename(_image.path))[0]]
 
-        library = {} # spectral library will be built in here
-        wav = {}
         for i,(img,name) in enumerate(zip(ilist,iname)): # loop through actual images
-            if name not in library:
+            if (name not in library) and (img.band_count() > 4): # skip RGB preview files
                 library[name] = {}
                 wav[name] = img.get_wavelengths()
             for _roi in rois: # loop through ROI layers
@@ -279,12 +289,13 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
                         roi.mask( v, crop=True, flag=f )
 
                         # average for spectral library
-                        X = roi.X(onlyFinite=True)
-                        X = X[ (X!=f).all(axis=-1), : ]
-                        avg = np.mean( X, axis=0 )
-                        if n not in library[name]:
-                            library[name][n] = []
-                        library[name][n] += [avg]
+                        if img.band_count() > 4: # skip RGB preview files
+                            X = roi.X(onlyFinite=True)
+                            X = X[ (X!=f).all(axis=-1), : ]
+                            avg = np.mean( X, axis=0 )
+                            if n not in library[name]:
+                                library[name][n] = []
+                            library[name][n] += [avg]
 
                         # store it
                         n = str(n).replace(' ','_').replace('-','_').replace('.','')
@@ -292,15 +303,17 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
                         O.save()
                         O.free()
                     elif 'point' in _roi.mode.lower():
-                        # export points to spectral library too
-                        if n not in library[name]:
-                            library[name][n] = []
-                        for x,y in v:
-                            if (x>=0) and (x<img.xdim()):
-                                if (y>=0) and (y<img.ydim()):
-                                    library[name][n] += [img.data[int(x),int(y),:]]
+                        if img.band_count() > 4: # skip RGB preview files
+                            # export points to spectral library too
+                            if n not in library[name]:
+                                library[name][n] = []
+                            for x,y in v:
+                                if (x>=0) and (x<img.xdim()):
+                                    if (y>=0) and (y<img.ydim()):
+                                        library[name][n] += [img.data[int(x),int(y),:]]
     
     # save libraries
+    print(list(library.keys()))
     for k,v in library.items():
         names = list(v.keys())
         spectra = np.vstack( v[names[0]] )
@@ -312,7 +325,7 @@ def export( filename : pathlib.Path = pathlib.Path('.'),
         O.save()
         O.free()
         if plot:
-            fig,ax = lib.quick_plot()
+            fig, ax = lib.quick_plot()
             ax.set_title(k)
             fig.show()
     O.save() # write everything to disk
